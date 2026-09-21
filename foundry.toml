@@ -1,0 +1,21 @@
+[profile.default]
+src = "contracts"
+test = "contracts/test"
+script = "contracts/script"
+out = "contracts/out"
+libs = ["lib"]
+cache_path = "contracts/cache"
+solc_version = "0.8.28"
+auto_detect_solc = false
+evm_version = "paris"
+optimizer = true
+optimizer_runs = 200
+
+[rpc_endpoints]
+ethereum = "https://ethereum-rpc.publicnode.com"
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+base = "https://base-rpc.publicnode.com"
+base_sepolia = "https://base-sepolia-rpc.publicnode.com"
+arbitrum = "https://arbitrum-one-rpc.publicnode.com"
+polygon = "https://polygon-bor-rpc.publicnode.com"
+optimism = "https://optimism-rpc.publicnode.com"
