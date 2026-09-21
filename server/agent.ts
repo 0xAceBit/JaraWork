@@ -647,7 +647,8 @@ Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url)
-    const path = url.pathname
+    // In production there is no Vite proxy — strip /api prefix so routes match both dev and prod
+    const path = url.pathname.replace(/^\/api/, '') || '/'
 
     if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' } })
 
