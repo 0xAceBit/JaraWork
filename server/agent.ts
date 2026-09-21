@@ -55,19 +55,20 @@ const MIME: Record<string, string> = {
 }
 
 async function serveStatic(pathname: string): Promise<Response | null> {
-  if (!IS_PROD) return null
-  // Strip leading slash
+  // Always try to serve static files when dist/ exists (both prod and any env with a build)
   const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
+  // Don't try to serve API paths as static files
+  if (rel.startsWith('agent/') || rel.startsWith('amazon/') || rel.startsWith('ebay/') || rel.startsWith('jumia/') || rel === 'health') return null
   const filePath = join(DIST_DIR, rel)
   const file = Bun.file(filePath)
   if (await file.exists()) {
     const mime = MIME[extname(filePath)] ?? 'application/octet-stream'
-    return new Response(file, { headers: { 'Content-Type': mime } })
+    return new Response(file, { headers: { 'Content-Type': mime, 'Cache-Control': rel === 'index.html' ? 'no-cache' : 'public, max-age=31536000' } })
   }
   // SPA fallback — serve index.html for all non-asset routes
   const index = Bun.file(join(DIST_DIR, 'index.html'))
   if (await index.exists()) {
-    return new Response(index, { headers: { 'Content-Type': 'text/html' } })
+    return new Response(index, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' } })
   }
   return null
 }
@@ -772,6 +773,7 @@ console.log(`[Agent] Listening on :${PORT}`)
 console.log(`[Agent] Contract: ${CONTRACT_ADDRESS || '(not set)'}`)
 console.log(`[Agent] Wallet:   ${AGENT_WALLET_ID || '(not set — POST /agent/setup)'}`)
 console.log(`[Agent] Poll: ${POLL_MS / 1000}s | Release: ${AUTO_RELEASE_DELAY_S / 3600}h | Refund: ${AUTO_REFUND_DELAY_S / 86400}d`)
+console.log(`[Agent] Dist dir: ${DIST_DIR} — index.html exists: ${existsSync(join(DIST_DIR, 'index.html'))}`)
 
 // Kick off the polling loop
 void runCycle()
