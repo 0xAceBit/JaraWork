@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment variables — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Agent persistent state
+server/agent-state.json
+
+# Build output
+dist/
+build/
+
+# Forge / Foundry build artifacts
+contracts/out/
+contracts/cache/
+
+# Logs
+*.log
+console.jsonl
+traces.jsonl
+
+# Circle recovery files
+.circle/
+
+# OS
+.DS_Store
+Thumbs.db

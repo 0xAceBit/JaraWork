@@ -5,7 +5,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { toast } from 'sonner'
-import { Bot, Zap, RefreshCw, Play, CheckCircle, XCircle, RotateCcw, Info, ExternalLink, Loader2, ShieldCheck } from 'lucide-react'
+import { Bot, Zap, RefreshCw, Play, CheckCircle, XCircle, RotateCcw, Info, ExternalLink, Loader2, ShieldCheck, AlertTriangle, Webhook, Bell, BellOff, ListRestart } from 'lucide-react'
+import DisputeAdmin from './DisputeAdmin'
 import { TokenUSDC } from '@web3icons/react'
 import { buildTxExplorerUrl, buildAddressExplorerUrl } from '../onchain-facts'
 import { arcTestnet } from 'viem/chains'
@@ -27,6 +28,23 @@ interface AgentStatusData {
   agentWalletId: string | null
   contractAddress: string | null
   balance: string
+  isLowBalance: boolean
+  lowBalanceThreshold: number
+  alertWebhookConfigured: boolean
+  newOrderWebhookConfigured: boolean
+  pushSubscriberCount: number
+  vapidEnabled: boolean
+  retryQueue: Array<{
+    key: string
+    orderId: string
+    marketplace: string
+    amount: string
+    attempts: number
+    maxRetries: number
+    state: 'pending_retry' | 'failed'
+    error: string
+    lastAttemptAt: number
+  }>
   pollIntervalMs: number
   autoReleaseDelayHours: number
   autoRefundDelayDays: number
@@ -59,6 +77,20 @@ export default function AgentStatus() {
   const [triggering, setTriggering] = useState(false)
   const [settingUp, setSettingUp] = useState(false)
   const [setupResult, setSetupResult] = useState<{ walletId: string; address: string; instructions: string[] } | null>(null)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [savingWebhook, setSavingWebhook] = useState(false)
+  const [webhookSaved, setWebhookSaved] = useState(false)
+
+  // New-order webhook
+  const [newOrderWebhookUrl, setNewOrderWebhookUrl] = useState('')
+  const [savingNewOrderWebhook, setSavingNewOrderWebhook] = useState(false)
+  const [newOrderWebhookSaved, setNewOrderWebhookSaved] = useState(false)
+
+  // Browser push notification state
+  const [pushSupported] = useState(() => 'serviceWorker' in navigator && 'PushManager' in window)
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [subscribingPush, setSubscribingPush] = useState(false)
 
   const { isConnected } = useAccount()
   const { setPlatform, isPending: setPlatformPending, isConfirming: setPlatformConfirming, isSuccess: setPlatformSuccess, error: setPlatformError } = useSetPlatform()
@@ -92,6 +124,94 @@ export default function AgentStatus() {
     if (setPlatformError) toast.error('setPlatform failed', { description: (setPlatformError as Error).message })
   }, [setPlatformError])
 
+  // Initialise push state on mount
+  useEffect(() => {
+    if (!pushSupported) return
+    setPushPermission(Notification.permission)
+    void (async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js')
+        const sub = await reg.pushManager.getSubscription()
+        setPushSubscribed(!!sub)
+      } catch { /* sw not supported in this context */ }
+    })()
+  }, [pushSupported])
+
+  async function subscribeToPush() {
+    if (!pushSupported) return
+    setSubscribingPush(true)
+    try {
+      const permission = await Notification.requestPermission()
+      setPushPermission(permission)
+      if (permission !== 'granted') {
+        toast.error('Notification permission denied. Enable notifications for this site in your browser settings.')
+        return
+      }
+      const vapidRes = await fetch('/api/agent/vapid-public-key')
+      const { vapidPublicKey } = await vapidRes.json() as { vapidPublicKey: string | null }
+      if (!vapidPublicKey) {
+        toast.error('VAPID keys not configured on the server. Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to .env.')
+        return
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidPublicKey,
+      })
+      const subJson = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
+      const res = await fetch('/api/agent/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subJson),
+      })
+      if (!res.ok) throw new Error('Server rejected subscription')
+      setPushSubscribed(true)
+      toast.success('Push notifications enabled! You will be notified when new orders arrive.')
+    } catch (e) {
+      toast.error('Failed to subscribe', { description: (e as Error).message })
+    } finally {
+      setSubscribingPush(false)
+    }
+  }
+
+  async function unsubscribeFromPush() {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+      const sub = await reg?.pushManager.getSubscription()
+      if (sub) {
+        await fetch('/api/agent/push-unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        })
+        await sub.unsubscribe()
+      }
+      setPushSubscribed(false)
+      toast.success('Push notifications disabled.')
+    } catch (e) {
+      toast.error('Failed to unsubscribe', { description: (e as Error).message })
+    }
+  }
+
+  async function saveNewOrderWebhook() {
+    if (!newOrderWebhookUrl.trim()) return
+    setSavingNewOrderWebhook(true)
+    try {
+      await fetch('/api/agent/new-order-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newOrderWebhookUrl.trim() }),
+      })
+      setNewOrderWebhookSaved(true)
+      toast.success('New-order webhook saved. Workers will be notified on each new order.')
+    } catch (e) {
+      toast.error('Failed to save webhook', { description: (e as Error).message })
+    } finally {
+      setSavingNewOrderWebhook(false)
+    }
+  }
+
   async function triggerCycle() {
     setTriggering(true)
     try {
@@ -115,6 +235,24 @@ export default function AgentStatus() {
       setError((e as Error).message)
     } finally {
       setSettingUp(false)
+    }
+  }
+
+  async function saveWebhook() {
+    if (!webhookUrl.trim()) return
+    setSavingWebhook(true)
+    try {
+      await fetch('/api/agent/alert-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl.trim() }),
+      })
+      setWebhookSaved(true)
+      toast.success('Webhook URL saved. You will be alerted when balance drops below the threshold.')
+    } catch (e) {
+      toast.error('Failed to save webhook', { description: (e as Error).message })
+    } finally {
+      setSavingWebhook(false)
     }
   }
 
@@ -154,6 +292,29 @@ export default function AgentStatus() {
         <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
           <p className="font-semibold">Agent backend not running</p>
           <p className="text-xs mt-1">Start it with: <code className="mono font-semibold">bun run agent</code> in a terminal, then refresh.</p>
+        </div>
+      )}
+
+      {/* Low-balance banner */}
+      {status && isConfigured && status.isLowBalance && (
+        <div
+          className="rounded-2xl px-4 py-3 flex items-start gap-3"
+          style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}
+        >
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" style={{ color: '#ea580c' }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: '#9a3412' }}>
+              Agent wallet is low on USDC
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#c2410c' }}>
+              Balance is <strong>{status.balance} USDC</strong> — below the {status.lowBalanceThreshold} USDC threshold.
+              New marketplace orders will be paused until the wallet is topped up.
+            </p>
+            <p className="text-xs mt-1.5 font-medium" style={{ color: '#9a3412' }}>
+              Top up address:{' '}
+              <span className="mono">{AGENT_WALLET_ADDRESS || '0xa7d90f5f3654a9d7da551fd24a4fba593a24fde6'}</span>
+            </p>
+          </div>
         </div>
       )}
 
@@ -256,6 +417,239 @@ export default function AgentStatus() {
           </div>
         </div>
       )}
+
+      {/* Webhook alert config */}
+      {status && isConfigured && (
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Webhook size={15} style={{ color: 'var(--accent-hover)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Low-Balance Alert</p>
+            {status.alertWebhookConfigured && (
+              <span
+                className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: '#dcfce7', color: '#16a34a' }}
+              >
+                Webhook active
+              </span>
+            )}
+          </div>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Fire a POST request to a URL of your choice when the agent wallet balance drops below{' '}
+            <strong>{status.lowBalanceThreshold} USDC</strong>. Use this to receive a Slack, Discord, or email alert.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={webhookUrl}
+              onChange={e => { setWebhookUrl(e.target.value); setWebhookSaved(false) }}
+              placeholder="https://hooks.slack.com/services/…"
+              className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ background: 'var(--surface-strong)', border: '1px solid var(--border)', color: 'var(--ink)' }}
+            />
+            <button
+              onClick={() => { void saveWebhook() }}
+              disabled={!webhookUrl.trim() || savingWebhook || webhookSaved}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-50 shrink-0"
+              style={{
+                background: webhookSaved ? '#dcfce7' : 'var(--accent)',
+                backgroundImage: webhookSaved ? 'none' : 'linear-gradient(135deg,#122d45,#1061a6)',
+                color: webhookSaved ? '#16a34a' : '#fff',
+              }}
+            >
+              {savingWebhook && <Loader2 size={13} className="animate-spin" />}
+              {webhookSaved ? <><CheckCircle size={13} /> Saved</> : 'Save'}
+            </button>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--subtle)' }}>
+            To set a custom threshold, add <code className="mono">LOW_BALANCE_THRESHOLD_USDC=10</code> to your <code className="mono">.env</code> and restart the agent.
+          </p>
+        </div>
+      )}
+
+      {/* Worker Notifications */}
+      {status && isConfigured && (
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-4"
+          style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Bell size={15} style={{ color: 'var(--accent-hover)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Worker Notifications</p>
+            {status.pushSubscriberCount > 0 && (
+              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                {status.pushSubscriberCount} subscriber{status.pushSubscriberCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Notify workers instantly when a new order is posted. Two options: browser push (this device) or a webhook URL (Slack, Discord, Make.com, email relay).
+          </p>
+
+          {/* Browser push toggle */}
+          {pushSupported ? (
+            <div
+              className="rounded-xl p-3 flex items-center justify-between gap-3"
+              style={{ background: 'var(--surface-strong)', border: '1px solid var(--border)' }}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {pushSubscribed
+                  ? <Bell size={16} style={{ color: '#16a34a' }} />
+                  : <BellOff size={16} style={{ color: 'var(--muted)' }} />
+                }
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                    {pushSubscribed ? 'Browser push enabled' : 'Enable browser push'}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--subtle)' }}>
+                    {pushPermission === 'denied'
+                      ? 'Blocked by browser — enable in site settings'
+                      : pushSubscribed
+                        ? 'This browser will receive OS-level notifications'
+                        : 'Get an OS notification each time a new order arrives'
+                    }
+                  </p>
+                </div>
+              </div>
+              {pushPermission !== 'denied' && (
+                <button
+                  onClick={() => { void (pushSubscribed ? unsubscribeFromPush() : subscribeToPush()) }}
+                  disabled={subscribingPush}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                  style={{
+                    background: pushSubscribed ? '#fee2e2' : 'var(--accent)',
+                    backgroundImage: pushSubscribed ? 'none' : 'linear-gradient(135deg,#e8700a,#a34d00)',
+                    color: pushSubscribed ? '#dc2626' : '#fff',
+                  }}
+                >
+                  {subscribingPush && <Loader2 size={12} className="animate-spin" />}
+                  {pushSubscribed ? 'Disable' : 'Enable'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs rounded-xl px-3 py-2" style={{ background: 'var(--surface-strong)', color: 'var(--subtle)' }}>
+              Browser push is not supported in this environment. Use the webhook option below.
+            </p>
+          )}
+
+          {/* New-order webhook */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <Webhook size={13} style={{ color: 'var(--muted)' }} />
+              <p className="text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>New-order webhook</p>
+              {status.newOrderWebhookConfigured && (
+                <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>Active</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={newOrderWebhookUrl}
+                onChange={e => { setNewOrderWebhookUrl(e.target.value); setNewOrderWebhookSaved(false) }}
+                placeholder="https://hooks.slack.com/services/…"
+                className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: 'var(--surface-strong)', border: '1px solid var(--border)', color: 'var(--ink)' }}
+              />
+              <button
+                onClick={() => { void saveNewOrderWebhook() }}
+                disabled={!newOrderWebhookUrl.trim() || savingNewOrderWebhook || newOrderWebhookSaved}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-50"
+                style={{
+                  background: newOrderWebhookSaved ? '#dcfce7' : 'var(--accent)',
+                  backgroundImage: newOrderWebhookSaved ? 'none' : 'linear-gradient(135deg,#e8700a,#a34d00)',
+                  color: newOrderWebhookSaved ? '#16a34a' : '#fff',
+                }}
+              >
+                {savingNewOrderWebhook && <Loader2 size={13} className="animate-spin" />}
+                {newOrderWebhookSaved ? <><CheckCircle size={13} /> Saved</> : 'Save'}
+              </button>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--subtle)' }}>
+              Payload: <code className="mono">{'{ title, body, orderId, marketplace, amount, url, timestamp }'}</code>
+            </p>
+          </div>
+
+          {/* VAPID setup note */}
+          {!status.vapidEnabled && pushSupported && (
+            <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
+              <p className="font-semibold">VAPID keys required for browser push</p>
+              <p className="mt-0.5">Run <code className="mono font-semibold">bunx web-push generate-vapid-keys</code> and add <code className="mono">VAPID_PUBLIC_KEY</code>, <code className="mono">VAPID_PRIVATE_KEY</code>, and <code className="mono">VAPID_EMAIL</code> to your <code className="mono">.env</code>, then restart the agent.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Retry queue */}
+      {status && isConfigured && (status.retryQueue?.length ?? 0) > 0 && (
+        <div
+          className="rounded-2xl p-4 flex flex-col gap-3"
+          style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}
+        >
+          <div className="flex items-center gap-2">
+            <ListRestart size={15} style={{ color: '#ea580c' }} />
+            <p className="text-sm font-semibold" style={{ color: '#9a3412' }}>
+              Retry Queue
+            </p>
+            <span
+              className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: '#ffedd5', color: '#c2410c' }}
+            >
+              {status.retryQueue.filter(e => e.state === 'pending_retry').length} pending
+              {status.retryQueue.filter(e => e.state === 'failed').length > 0 &&
+                ` · ${status.retryQueue.filter(e => e.state === 'failed').length} failed`}
+            </span>
+          </div>
+          <p className="text-xs" style={{ color: '#c2410c' }}>
+            These orders had USDC approved on-chain but <code className="mono">createOrder</code> failed.
+            The agent will retry <code className="mono">createOrder</code> only (no re-approval) up to 3 times.
+          </p>
+          <div className="flex flex-col gap-2">
+            {status.retryQueue.map(entry => (
+              <div
+                key={entry.key}
+                className="rounded-xl px-3 py-2.5 flex flex-col gap-1"
+                style={{
+                  background: entry.state === 'failed' ? '#fee2e2' : '#ffedd5',
+                  border: `1px solid ${entry.state === 'failed' ? '#fca5a5' : '#fdba74'}`,
+                }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold truncate" style={{ color: entry.state === 'failed' ? '#991b1b' : '#9a3412' }}>
+                    {entry.orderId}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <TokenUSDC variant="branded" size={12} />
+                    <span className="text-xs font-semibold tabular" style={{ color: entry.state === 'failed' ? '#991b1b' : '#9a3412' }}>
+                      {entry.amount}
+                    </span>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: entry.state === 'failed' ? '#fecaca' : '#fed7aa',
+                        color: entry.state === 'failed' ? '#dc2626' : '#c2410c',
+                      }}
+                    >
+                      {entry.state === 'failed' ? 'Failed' : `Retry ${entry.attempts}/${entry.maxRetries}`}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs mono truncate" style={{ color: entry.state === 'failed' ? '#b91c1c' : '#c2410c' }}>
+                  {entry.error}
+                </p>
+                <p className="text-xs" style={{ color: entry.state === 'failed' ? '#b91c1c' : '#c2410c' }}>
+                  {entry.marketplace} · last attempt {timeAgo(entry.lastAttemptAt)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dispute resolution admin panel */}
+      {status && isConfigured && <DisputeAdmin />}
 
       {/* Timers */}
       {status && isConfigured && (

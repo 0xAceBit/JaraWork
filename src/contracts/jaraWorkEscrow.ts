@@ -1,12 +1,12 @@
 /**
  * JaraWorkEscrow contract config
- * Deployed on Arc Testnet at 0xf34d22b12d168925d4f0ffde2e3fe769e7f15440 (v3 — owner=user wallet, platform=agent wallet)
- * Previous: 0xd454036b54c5be123e2e3331fd9363df14400af5 (v2), 0x74eb073bee50937a762cdd3836ca1b3b12919c5d (v1)
+ * Deployed on Arc Testnet at 0x9e820abe45420bf544331c39dc0b5fed738abbc2 (v4 — adds getDisputedOrders view)
+ * Previous: 0xf34d22b12d168925d4f0ffde2e3fe769e7f15440 (v3), 0xd454036b54c5be123e2e3331fd9363df14400af5 (v2), 0x74eb073bee50937a762cdd3836ca1b3b12919c5d (v1)
  */
 import artifact from '../../contracts/out/JaraWorkEscrow.sol/JaraWorkEscrow.json'
 
 export const JARA_WORK_ESCROW = {
-  address: '0xf34d22b12d168925d4f0ffde2e3fe769e7f15440' as const,
+  address: '0x9e820abe45420bf544331c39dc0b5fed738abbc2' as const,
   abi: artifact.abi,
 } as const
 

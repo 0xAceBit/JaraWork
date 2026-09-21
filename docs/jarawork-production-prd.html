@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JaraWork — Production Readiness Document</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #0d1f35;
+    --blue:   #1061a6;
+    --green:  #16a34a;
+    --amber:  #b45309;
+    --red:    #dc2626;
+    --purple: #7c3aed;
+    --ink:    #1a202c;
+    --muted:  #64748b;
+    --border: #e2e8f0;
+    --bg:     #f8fafc;
+    --white:  #ffffff;
+  }
+
+  html { font-size: 13px; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--white);
+    line-height: 1.65;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 48px 80px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(145deg, #0d1f35 0%, #122d45 50%, #0e3460 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 48px 44px;
+    margin-bottom: 44px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16,97,166,0.45) 0%, transparent 70%);
+  }
+  .cover-strip {
+    height: 4px;
+    background: linear-gradient(90deg, #5fbeff, #af8ff4, #f05c6b, #ffcd83, #7ef1b3);
+    border-radius: 2px;
+    margin-bottom: 28px;
+    width: 120px;
+  }
+  .cover h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+  .cover h1 span { color: #7ef1b3; }
+  .cover .subtitle {
+    font-size: 1rem;
+    opacity: 0.7;
+    margin-bottom: 28px;
+  }
+  .cover-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 24px;
+    font-size: 0.78rem;
+    opacity: 0.85;
+  }
+  .cover-meta dt { opacity: 0.6; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+  .cover-meta dd { font-family: 'JetBrains Mono', monospace; font-weight: 600; word-break: break-all; }
+
+  /* ── Typography ── */
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+    margin: 44px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 28px 0 10px;
+  }
+  h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin: 18px 0 6px;
+  }
+  p { margin-bottom: 10px; color: var(--ink); }
+  strong { font-weight: 600; }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--navy);
+  }
+  ul, ol { padding-left: 20px; margin-bottom: 10px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--blue); }
+
+  /* ── Callout ── */
+  .callout {
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+  }
+  .callout-red    { background: #fef2f2; border-left: 3px solid var(--red); }
+  .callout-amber  { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .callout-blue   { background: #eff6ff; border-left: 3px solid var(--blue); }
+  .callout-green  { background: #f0fdf4; border-left: 3px solid var(--green); }
+  .callout-purple { background: #faf5ff; border-left: 3px solid var(--purple); }
+  .callout-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  /* ── Priority badge ── */
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  .badge-p0 { background: #fee2e2; color: #991b1b; }
+  .badge-p1 { background: #fef3c7; color: #92400e; }
+  .badge-p2 { background: #e0e7ff; color: #3730a3; }
+  .badge-effort-s { background: #dcfce7; color: #166534; }
+  .badge-effort-m { background: #fef3c7; color: #92400e; }
+  .badge-effort-l { background: #fee2e2; color: #991b1b; }
+
+  /* ── Summary table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 16px 0 24px;
+  }
+  th {
+    background: var(--navy);
+    color: white;
+    font-weight: 600;
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+  }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child  { border-radius: 0 8px 0 0; }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:nth-child(even) td { background: var(--bg); }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: var(--navy); }
+
+  /* ── Completion grid ── */
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+  }
+  .status-item.done { background: #f0fdf4; }
+  .status-item.stub { background: #fffbeb; }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-green  { background: var(--green); }
+  .dot-amber  { background: #f59e0b; }
+
+  /* ── Sprint boxes ── */
+  .sprint {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .sprint-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    margin-bottom: 6px;
+  }
+  .sprint-1 .sprint-label { color: var(--red); }
+  .sprint-2 .sprint-label { color: var(--amber); }
+  .sprint-3 .sprint-label { color: var(--purple); }
+  .sprint-items { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sprint-tag {
+    font-size: 0.78rem;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--white);
+  }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-box {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 0; font-size: 11px; }
+    .cover { border-radius: 0; margin: 0 0 32px; }
+    h2 { page-break-before: auto; }
+    .sprint, table, .callout { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ COVER ══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-strip"></div>
+  <h1>JaraWork<br /><span>Production Readiness</span></h1>
+  <p class="subtitle">Pre-launch gap analysis &amp; engineering backlog</p>
+  <dl class="cover-meta">
+    <div><dt>Version</dt><dd>1.0</dd></div>
+    <div><dt>Date</dt><dd>September 21, 2026</dd></div>
+    <div><dt>Contract (Testnet)</dt><dd>0xf34d22b12d168925d4f0ffde2e3fe769e7f15440</dd></div>
+    <div><dt>Agent Wallet</dt><dd>0xa7d90f5f3654a9d7da551fd24a4fba593a24fde6</dd></div>
+    <div><dt>Chain</dt><dd>Arc Testnet → Arc Mainnet</dd></div>
+    <div><dt>Status</dt><dd>Testnet complete · Mainnet pending</dd></div>
+  </dl>
+</div>
+
+<!-- ══ EXECUTIVE SUMMARY ════════════════════════════════════════════════ -->
+<h2>Executive Summary</h2>
+<p>JaraWork is an autonomous marketplace-order-to-worker platform built on Arc. Orders from Jaramarket, Amazon, eBay, and Jumia are ingested by a Circle developer-controlled agent wallet, posted as USDC escrow orders on-chain, claimed by workers worldwide, and paid automatically on delivery confirmation — no human intervention required.</p>
+<p>The platform is <strong>functionally complete for testnet demonstration</strong>. This document catalogues every gap that must be closed before a public mainnet launch, prioritised by impact and estimated engineering effort.</p>
+
+<!-- ══ WHAT IS COMPLETE ════════════════════════════════════════════════ -->
+<h2>What Is Already Complete</h2>
+<div class="status-grid">
+  <div class="status-item done"><div class="dot dot-green"></div>Smart contract (escrow, roles, fees, disputes)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Autonomous agent (poll, create, release, refund)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Frontend — all 5 tabs wired</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Wallet connection + chain switching</div>
+  <div class="status-item done"><div class="dot dot-green"></div>USDC approve → createOrder two-step flow</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Worker claim + delivery submission</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Auto-release payment (24h timer)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Auto-refund unclaimed orders (7-day timer)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Jaramarket adapter (REST + Bearer token)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Jumia adapter (direct + relay fallback)</div>
+  <div class="status-item stub"><div class="dot dot-amber"></div>Amazon adapter (stub — relay not implemented)</div>
+  <div class="status-item stub"><div class="dot dot-amber"></div>eBay adapter (stub — OAuth not implemented)</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Platform role set on contract</div>
+  <div class="status-item done"><div class="dot dot-green"></div>Agent wallet created + funded (9 USDC)</div>
+</div>
+
+<!-- ══ SECTION 1: CRITICAL ════════════════════════════════════════════ -->
+<h2>Section 1 — Critical Gaps <span class="badge badge-p0">Blocks Real Use</span></h2>
+<p>These items must be resolved before any real user can safely interact with the platform.</p>
+
+<h3>1.1 &nbsp;Order Dedup Persistence <span class="badge badge-p0">P0</span> <span class="badge badge-effort-s">Small</span></h3>
+<div class="callout callout-red">
+  <div class="callout-label">Risk</div>
+  Every agent restart wipes the in-memory <code>postedKeys</code> Set. On the next poll, all previously posted marketplace orders are re-submitted as duplicates — double-charging the agent wallet and flooding the order board with ghost orders.
+</div>
+<h4>Required Fix</h4>
+<p>Persist <code>postedKeys</code> to <code>.data/posted-keys.json</code>. Read on startup; append atomically on each new post. Mount a Render persistent disk to <code>.data/</code> so the file survives redeployments.</p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Restarting the agent does not re-post any previously posted order.</li>
+  <li><code>.data/posted-keys.json</code> is excluded from version control but present at runtime.</li>
+</ul>
+
+<h3>1.2 &nbsp;Amazon SP-API Relay <span class="badge badge-p0">P0</span> <span class="badge badge-effort-m">Medium</span></h3>
+<div class="callout callout-amber">
+  <div class="callout-label">Current State</div>
+  <code>GET /api/amazon/orders</code> returns <code>[]</code> with a stub note. No Amazon orders will ever flow until this is implemented.
+</div>
+<h4>Required Fix</h4>
+<ol>
+  <li>Accept <code>AMAZON_CLIENT_ID</code>, <code>AMAZON_CLIENT_SECRET</code>, <code>AMAZON_REFRESH_TOKEN</code>, <code>AMAZON_MARKETPLACE_ID</code> from <code>.env</code>.</li>
+  <li>Exchange refresh token for a bearer token via <code>POST https://api.amazon.com/auth/o2/token</code>.</li>
+  <li>Sign <code>GET /orders/v0/orders?OrderStatuses=Unshipped</code> with AWS SigV4.</li>
+  <li>Map each order to <code>{ externalId, title, description, usdcAmount, sourceMarketplace: 'amazon' }</code>.</li>
+</ol>
+<h4>Credentials Required</h4>
+<p><code>AMAZON_CLIENT_ID</code> · <code>AMAZON_CLIENT_SECRET</code> · <code>AMAZON_REFRESH_TOKEN</code> · <code>AMAZON_MARKETPLACE_ID</code></p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>With valid credentials, agent polls Amazon and posts orders on-chain automatically.</li>
+  <li>Missing credentials returns empty array gracefully — no crash.</li>
+</ul>
+
+<h3>1.3 &nbsp;eBay Fulfillment API Relay <span class="badge badge-p0">P0</span> <span class="badge badge-effort-m">Medium</span></h3>
+<div class="callout callout-amber">
+  <div class="callout-label">Current State</div>
+  <code>GET /api/ebay/orders</code> returns <code>[]</code> with a stub note. No eBay orders flow until this is implemented.
+</div>
+<h4>Required Fix</h4>
+<ol>
+  <li>Accept <code>EBAY_CLIENT_ID</code> and <code>EBAY_CLIENT_SECRET</code> from <code>.env</code>.</li>
+  <li>Fetch OAuth2 client credentials token from <code>https://api.ebay.com/identity/v1/oauth2/token</code>.</li>
+  <li>Call <code>GET /sell/fulfillment/v1/order?filter=orderfulfillmentstatus:{NOT_STARTED}</code>.</li>
+  <li>Cache the token for its <code>expires_in</code> duration.</li>
+  <li>Map to <code>MarketplaceOrder</code> format.</li>
+</ol>
+<h4>Credentials Required</h4>
+<p><code>EBAY_CLIENT_ID</code> · <code>EBAY_CLIENT_SECRET</code></p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>eBay orders appear on the board and are posted on-chain after agent poll.</li>
+  <li>Token is cached — not re-fetched on every cycle.</li>
+</ul>
+
+<h3>1.4 &nbsp;Low-Balance Alert on Agent Wallet <span class="badge badge-p0">P0</span> <span class="badge badge-effort-s">Small</span></h3>
+<div class="callout callout-red">
+  <div class="callout-label">Risk</div>
+  When the agent wallet USDC balance drops to zero, all order creation fails silently. Workers see no orders. The platform appears broken with no visible cause.
+</div>
+<h4>Required Fix</h4>
+<ul>
+  <li>Add <code>LOW_BALANCE_THRESHOLD_USDC</code> env var (default: <code>5.00</code>).</li>
+  <li>Check balance at the start of every poll cycle. Log an <code>error</code> action and show a red banner in the Agent tab when below threshold.</li>
+  <li>Optionally: POST to <code>ALERT_WEBHOOK_URL</code> with low-balance JSON payload.</li>
+</ul>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Agent tab shows a prominent "Low Balance" warning when balance &lt; threshold.</li>
+  <li>Warning clears automatically once balance is topped up.</li>
+</ul>
+
+<h3>1.5 &nbsp;Dispute Resolution UI <span class="badge badge-p0">P0</span> <span class="badge badge-effort-s">Small</span></h3>
+<div class="callout callout-red">
+  <div class="callout-label">Risk</div>
+  Disputed orders lock USDC in escrow forever. The <code>resolveDispute</code> function exists on the contract but has no UI. Any dispute is permanently stuck.
+</div>
+<h4>Required Fix</h4>
+<p>Add an Admin section to the Agent tab, visible only when the connected wallet is the contract owner:</p>
+<ul>
+  <li>List all disputed orders with title, buyer, worker, and USDC amount.</li>
+  <li>Two action buttons per order: <strong>Pay Worker</strong> and <strong>Refund Buyer</strong>.</li>
+  <li>Both call <code>resolveDispute(key, favorWorker)</code> via the wagmi write hook pattern.</li>
+</ul>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Owner wallet can resolve any dispute in one click.</li>
+  <li>Non-owner wallets do not see the admin section.</li>
+  <li>Resolved orders leave the disputed list after tx confirmation.</li>
+</ul>
+
+<!-- ══ SECTION 2: IMPORTANT ════════════════════════════════════════════ -->
+<h2>Section 2 — Important Gaps <span class="badge badge-p1">Reliability</span></h2>
+<p>These items do not block launch but will cause friction or data loss in production under real load.</p>
+
+<h3>2.1 &nbsp;Jaramarket Webhook (vs. 60s Polling) <span class="badge badge-p1">P1</span> <span class="badge badge-effort-m">Medium</span></h3>
+<div class="callout callout-blue">
+  <div class="callout-label">Impact</div>
+  New Jaramarket orders can take up to 60 seconds to appear on JaraWork. Workers may claim orders from competing platforms first.
+</div>
+<h4>Required Fix</h4>
+<p>Add <code>POST /api/jaramarket/webhook</code> to the agent server. Validate the payload with an HMAC check using <code>JARAMARKET_WEBHOOK_SECRET</code>. Process the order immediately on receipt — no waiting for the next cycle.</p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>New Jaramarket orders appear on-chain within 5 seconds of being placed.</li>
+  <li>Invalid/unsigned payloads are rejected with HTTP 401.</li>
+</ul>
+
+<h3>2.2 &nbsp;Order Board Pagination <span class="badge badge-p1">P1</span> <span class="badge badge-effort-s">Small</span></h3>
+<div class="callout callout-blue">
+  <div class="callout-label">Impact</div>
+  <code>getOpenOrders()</code> returns all keys in a single RPC call. At 500+ orders this becomes slow and may time out.
+</div>
+<h4>Required Fix</h4>
+<p>Replace <code>getOpenOrders()</code> with paginated reads via <code>getOrderKeys(offset, limit)</code>. Show 20 orders per page with a "Load more" control. Total count from <code>getOrderCount()</code>.</p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Order Board loads in under 1 second with 500+ total orders.</li>
+  <li>"Load more" appends the next page without a full re-fetch.</li>
+</ul>
+
+<h3>2.3 &nbsp;Worker Notifications <span class="badge badge-p1">P1</span> <span class="badge badge-effort-m">Medium</span></h3>
+<div class="callout callout-blue">
+  <div class="callout-label">Impact</div>
+  Workers have no way to know when a new order arrives. Serious workers cannot monitor the app constantly.
+</div>
+<h4>Options</h4>
+<ul>
+  <li><strong>Option A — Web Push:</strong> Prompt for notification permission. Push to subscribed workers when a new order is posted.</li>
+  <li><strong>Option B — Webhook/email:</strong> <code>WORKER_ALERT_WEBHOOK_URL</code> in <code>.env</code>. POST order details; connect to SendGrid, Resend, or Slack.</li>
+</ul>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Workers receive notification within 90 seconds of a new order being posted on-chain.</li>
+</ul>
+
+<h3>2.4 &nbsp;Agent Error Recovery / Retry Queue <span class="badge badge-p1">P1</span> <span class="badge badge-effort-m">Medium</span></h3>
+<div class="callout callout-amber">
+  <div class="callout-label">Risk</div>
+  If <code>approveUsdc</code> succeeds but <code>createOrder</code> fails, the approval is consumed and the order is silently dropped. No retry occurs.
+</div>
+<h4>Required Fix</h4>
+<p>Introduce a retry queue persisted to <code>.data/retry-queue.json</code>. On <code>createOrder</code> failure after a successful approve: add to queue with <code>retryAt = now + 60s</code>. Retry up to 3 times. After 3 failures: log an error action and drop the entry.</p>
+<h4>Acceptance Criteria</h4>
+<ul>
+  <li>Failed <code>createOrder</code> after successful <code>approve</code> is retried up to 3 times.</li>
+  <li>After 3 failures, Agent tab shows an error with the order ID and reason.</li>
+</ul>
+
+<!-- ══ SECTION 3: NICE TO HAVE ════════════════════════════════════════ -->
+<h2>Section 3 — Nice to Have <span class="badge badge-p2">Polish</span></h2>
+
+<h3>3.1 &nbsp;Order Search and Filtering <span class="badge badge-p2">P2</span> <span class="badge badge-effort-s">Small</span></h3>
+<p>Add a filter bar to the Order Board: filter by marketplace (All / Jaramarket / Amazon / eBay / Jumia), USDC amount range (min/max), and sort order (newest / highest value). All filtering is client-side against the already-fetched order list — no contract changes needed.</p>
+
+<h3>3.2 &nbsp;Worker Reputation / Completion Score <span class="badge badge-p2">P2</span> <span class="badge badge-effort-l">Large</span></h3>
+<p>Workers are currently anonymous addresses. Add a simple on-chain or off-chain reputation system: count completed orders per worker address from contract events. Display a completion-rate badge on order cards. Optionally allow buyers to restrict claiming to workers above a minimum score.</p>
+
+<h3>3.3 &nbsp;Admin Panel Tab <span class="badge badge-p2">P2</span> <span class="badge badge-effort-s">Small</span></h3>
+<p>Replace the "Activate Platform Role" card in the Agent tab with a dedicated owner-only Admin section: current fee bps (editable), platform address (changeable), claim timeout setting, and the dispute resolution queue. Consolidates all owner actions in one place.</p>
+
+<h3>3.4 &nbsp;Delivery Proof Standards <span class="badge badge-p2">P2</span> <span class="badge badge-effort-s">Small</span></h3>
+<p>The <code>deliveryProof</code> field currently accepts any free-form string. Define a structured format: physical goods require <code>CARRIER:TRACKINGNUMBER</code>; digital work requires a URL or IPFS hash. Validate client-side before submission. Display detected type (tracking link, IPFS viewer, URL preview) in the order card.</p>
+
+<h3>3.5 &nbsp;Mainnet Migration Checklist <span class="badge badge-p2">P2</span></h3>
+<ul class="checklist">
+  <li><div class="check-box"></div>Obtain an independent security audit of <code>JaraWorkEscrow.sol</code></li>
+  <li><div class="check-box"></div>Replace testnet Circle API key (<code>TEST:...</code>) with a <code>LIVE:...</code> key</li>
+  <li><div class="check-box"></div>Re-register entity secret against the live key</li>
+  <li><div class="check-box"></div>Fund agent wallet with real USDC on Arc mainnet</li>
+  <li><div class="check-box"></div>Deploy contract with mainnet USDC address (<code>0x3600000000000000000000000000000000000000</code>)</li>
+  <li><div class="check-box"></div>Update all <code>arcTestnet</code> chain references to <code>arc</code> (chain ID 4506)</li>
+  <li><div class="check-box"></div>Remove "Arc Testnet" badges from UI</li>
+  <li><div class="check-box"></div>Set up uptime monitoring on the Render service</li>
+  <li><div class="check-box"></div>Configure <code>ALERT_WEBHOOK_URL</code> for low-balance and error alerts</li>
+  <li><div class="check-box"></div>Test full end-to-end flow on mainnet with minimum amounts before opening to public</li>
+</ul>
+
+<!-- ══ SUMMARY TABLE ════════════════════════════════════════════════ -->
+<h2>Summary Table</h2>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Area</th><th>Priority</th><th>Effort</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1.1</td><td>Order dedup persistence</td><td><span class="badge badge-p0">P0</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>1.2</td><td>Amazon SP-API relay</td><td><span class="badge badge-p0">P0</span></td><td><span class="badge badge-effort-m">Medium</span></td><td>Stub only</td></tr>
+    <tr><td>1.3</td><td>eBay Fulfillment relay</td><td><span class="badge badge-p0">P0</span></td><td><span class="badge badge-effort-m">Medium</span></td><td>Stub only</td></tr>
+    <tr><td>1.4</td><td>Low-balance alert</td><td><span class="badge badge-p0">P0</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>1.5</td><td>Dispute resolution UI</td><td><span class="badge badge-p0">P0</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>2.1</td><td>Jaramarket webhook</td><td><span class="badge badge-p1">P1</span></td><td><span class="badge badge-effort-m">Medium</span></td><td>Not built</td></tr>
+    <tr><td>2.2</td><td>Order board pagination</td><td><span class="badge badge-p1">P1</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>2.3</td><td>Worker notifications</td><td><span class="badge badge-p1">P1</span></td><td><span class="badge badge-effort-m">Medium</span></td><td>Not built</td></tr>
+    <tr><td>2.4</td><td>Agent retry queue</td><td><span class="badge badge-p1">P1</span></td><td><span class="badge badge-effort-m">Medium</span></td><td>Not built</td></tr>
+    <tr><td>3.1</td><td>Order search / filter</td><td><span class="badge badge-p2">P2</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>3.2</td><td>Worker reputation</td><td><span class="badge badge-p2">P2</span></td><td><span class="badge badge-effort-l">Large</span></td><td>Not built</td></tr>
+    <tr><td>3.3</td><td>Admin panel tab</td><td><span class="badge badge-p2">P2</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>3.4</td><td>Delivery proof standards</td><td><span class="badge badge-p2">P2</span></td><td><span class="badge badge-effort-s">Small</span></td><td>Not built</td></tr>
+    <tr><td>3.5</td><td>Mainnet migration checklist</td><td><span class="badge badge-p2">P2</span></td><td>Planning</td><td>Not started</td></tr>
+  </tbody>
+</table>
+
+<!-- ══ BUILD ORDER ════════════════════════════════════════════════════ -->
+<h2>Recommended Build Order</h2>
+<div class="sprint sprint-1">
+  <div class="sprint-label">Sprint 1 — Pre-launch blockers (P0)</div>
+  <div class="sprint-items">
+    <span class="sprint-tag">1.1 Dedup persistence</span>
+    <span class="sprint-tag">1.4 Low-balance alert</span>
+    <span class="sprint-tag">1.5 Dispute resolution UI</span>
+    <span class="sprint-tag">1.2 Amazon relay</span>
+    <span class="sprint-tag">1.3 eBay relay</span>
+  </div>
+</div>
+<div class="sprint sprint-2">
+  <div class="sprint-label">Sprint 2 — Reliability (P1)</div>
+  <div class="sprint-items">
+    <span class="sprint-tag">2.2 Pagination</span>
+    <span class="sprint-tag">2.4 Retry queue</span>
+    <span class="sprint-tag">2.1 Jaramarket webhook</span>
+    <span class="sprint-tag">2.3 Worker notifications</span>
+  </div>
+</div>
+<div class="sprint sprint-3">
+  <div class="sprint-label">Sprint 3 — Polish + mainnet (P2)</div>
+  <div class="sprint-items">
+    <span class="sprint-tag">3.1 Search/filter</span>
+    <span class="sprint-tag">3.3 Admin panel</span>
+    <span class="sprint-tag">3.4 Delivery proof</span>
+    <span class="sprint-tag">3.5 Mainnet checklist</span>
+    <span class="sprint-tag">3.2 Reputation (post-launch)</span>
+  </div>
+</div>
+
+<!-- ══ FOOTER ════════════════════════════════════════════════════════ -->
+<div class="footer">
+  <span>JaraWork v1.0 · Production Readiness Document</span>
+  <span>Generated by Arc Studio · September 2026</span>
+</div>
+
+</body>
+</html>

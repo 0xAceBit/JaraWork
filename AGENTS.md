@@ -30,7 +30,7 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 | Contract | Address | Chain | Notes |
 |---|---|---|---|
-| JaraWorkEscrow v3 | `0xf34d22b12d168925d4f0ffde2e3fe769e7f15440` | Arc Testnet | owner=0x362f5b..., platform=agent wallet; txHash: 0x0637c8d101297be6556da81ddc415d6e6bfb4d26644fad80fd36d776753a303e |
+| JaraWorkEscrow v3 | `0x9e820abe45420bf544331c39dc0b5fed738abbc2` | Arc Testnet | owner=0x362f5b..., platform=agent wallet; txHash: 0x0637c8d101297be6556da81ddc415d6e6bfb4d26644fad80fd36d776753a303e |
 | JaraWorkEscrow v2 | `0xd454036b54c5be123e2e3331fd9363df14400af5` | Arc Testnet | Platform agent role; feeBps=250 (deprecated) |
 | JaraWorkEscrow v1 | `0x74eb073bee50937a762cdd3836ca1b3b12919c5d` | Arc Testnet | Original, no platform role |
 

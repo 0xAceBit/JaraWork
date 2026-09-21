@@ -3,22 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --bg: #ffffff;
-  --bg-gradient: linear-gradient(180deg, #f9f9fc 0%, #fffcf7 52%, #fbf7f2 100%);
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.90);
-  --surface-muted: #f5f5f8;
-  --ink: #122d45;
-  --ink-2: #334155;
-  --muted: #6b6580;
-  --subtle: #8a849c;
-  --border: rgba(18, 45, 69, 0.12);
-  --border-strong: rgba(25, 53, 77, 0.50);
-  --accent: #122d45;
-  --accent-hover: #1061a6;
-  --focus: #85b1ed;
-  --success: #1a8047;
-  --danger: #ba2b4c;
+  /* Warm amber/cream canvas — inspired by the booking-app reference */
+  --bg: #fdf6ef;
+  --bg-gradient: linear-gradient(160deg, #fdebd6 0%, #fdf6ef 40%, #fffaf5 100%);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-strong: rgba(255, 255, 255, 0.95);
+  --surface-muted: #fef3e8;
+  --surface-card: rgba(255, 255, 255, 0.90);
+
+  /* Ink — warm near-black */
+  --ink: #1a1208;
+  --ink-2: #3d2e1e;
+
+  /* Muted text */
+  --muted: #7a6650;
+  --subtle: #a8937d;
+
+  /* Borders — warm tan */
+  --border: rgba(160, 120, 70, 0.14);
+  --border-strong: rgba(140, 95, 45, 0.40);
+
+  /* Accent — warm amber/orange (matches the booking app's orange CTA) */
+  --accent: #e8700a;
+  --accent-hover: #c75f00;
+  --accent-light: #fff3e0;
+  --accent-text: #7c3a00;
+
+  /* Focus ring */
+  --focus: #f5b87a;
+
+  /* Semantic */
+  --success: #1a6e3c;
+  --danger: #c0392b;
+
+  /* Extra warm tones */
+  --warm-100: #fdebd6;
+  --warm-200: #fad4a8;
+  --warm-300: #f5a95c;
 }
 
 * {

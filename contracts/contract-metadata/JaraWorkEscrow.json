@@ -1,13 +1,27 @@
 {
-  "contractAddress": "0xf34d22b12d168925d4f0ffde2e3fe769e7f15440",
+  "contractAddress": "0x9e820abe45420bf544331c39dc0b5fed738abbc2",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/JaraWorkEscrow.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/JaraWorkEscrow.sol/JaraWorkEscrow.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xf34d22b12d168925d4f0ffde2e3fe769e7f15440"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x9e820abe45420bf544331c39dc0b5fed738abbc2"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x9e820abe45420bf544331c39dc0b5fed738abbc2",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x9e820abe45420bf544331c39dc0b5fed738abbc2",
+      "txHash": "0xa93d7f060e0ecafa50c0e3a11765db479f385a8ac590136eed2e87caa50bdd92",
+      "deployedAt": "2026-09-21T12:32:43.268Z"
+    },
+    {
+      "chain": "Arc Testnet",
+      "address": "0x2eea3b5069e5fa8f8583bf74827c69ef04a1d568",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x2eea3b5069e5fa8f8583bf74827c69ef04a1d568",
+      "txHash": "0x5dd845923807e74564f9221e55be93ab0556a8ae7068b92e1c0c79c28503729c",
+      "deployedAt": "2026-09-21T11:22:35.217Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0xf34d22b12d168925d4f0ffde2e3fe769e7f15440",
@@ -188,6 +202,19 @@
     },
     {
       "type": "function",
+      "name": "getDisputedOrders",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "getOpenOrders",
       "inputs": [],
       "outputs": [
@@ -195,6 +222,35 @@
           "name": "",
           "type": "bytes32[]",
           "internalType": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getOpenOrdersPaginated",
+      "inputs": [
+        {
+          "name": "offset",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "limit",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "keys",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        },
+        {
+          "name": "total",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "stateMutability": "view"

@@ -295,6 +295,46 @@ contract JaraWorkEscrow is Ownable, ReentrancyGuard {
         return keys;
     }
 
+    /// @notice Returns up to `limit` open-order keys starting from open-order index `offset`.
+    ///         `total` is the total number of open orders (for pagination math client-side).
+    function getOpenOrdersPaginated(uint256 offset, uint256 limit)
+        external
+        view
+        returns (bytes32[] memory keys, uint256 total)
+    {
+        // First pass: count open orders
+        for (uint256 i = 0; i < orderKeys.length; i++) {
+            if (orders[orderKeys[i]].status == OrderStatus.Open) {
+                total++;
+            }
+        }
+
+        if (offset >= total || limit == 0) {
+            keys = new bytes32[](0);
+            return (keys, total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        keys = new bytes32[](end - offset);
+
+        // Second pass: collect the slice
+        uint256 openIdx;
+        uint256 resultIdx;
+        for (uint256 i = 0; i < orderKeys.length; i++) {
+            bytes32 key = orderKeys[i];
+            if (orders[key].status == OrderStatus.Open) {
+                if (openIdx >= offset && openIdx < end) {
+                    keys[resultIdx] = key;
+                    resultIdx++;
+                }
+                openIdx++;
+                if (openIdx >= end) break;
+            }
+        }
+        return (keys, total);
+    }
+
     function getDeliveredOrders() external view returns (bytes32[] memory) {
         uint256 count;
 
@@ -338,6 +378,25 @@ contract JaraWorkEscrow is Ownable, ReentrancyGuard {
             }
         }
 
+        return keys;
+    }
+
+    function getDisputedOrders() external view returns (bytes32[] memory) {
+        uint256 count;
+        for (uint256 i = 0; i < orderKeys.length; i++) {
+            if (orders[orderKeys[i]].status == OrderStatus.Disputed) {
+                count++;
+            }
+        }
+        bytes32[] memory keys = new bytes32[](count);
+        uint256 idx;
+        for (uint256 i = 0; i < orderKeys.length; i++) {
+            bytes32 key = orderKeys[i];
+            if (orders[key].status == OrderStatus.Disputed) {
+                keys[idx] = key;
+                idx++;
+            }
+        }
         return keys;
     }
 

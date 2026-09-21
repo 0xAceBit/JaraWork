@@ -13,7 +13,8 @@
     "check": "bash scripts/check.sh",
     "contracts:build": "forge build",
     "contracts:test": "forge test",
-    "agent": "bun run server/agent.ts"
+    "agent": "bun run server/agent.ts",
+    "start": "bun run server/agent.ts & bunx vite build && bunx vite preview --port 7860 --host 0.0.0.0"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.18.0",
@@ -35,7 +36,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
     "viem": "^2.56.3",
-    "wagmi": "^2.19.5"
+    "wagmi": "^2.19.5",
+    "web-push": "^3.6.7"
   },
   "overrides": {
     "viem": "^2.56.3"
