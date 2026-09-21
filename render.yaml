@@ -2,7 +2,7 @@ services:
   - type: web
     name: jarawork
     runtime: node
-    buildCommand: npm install -g bun && bun install && bunx vite build
+    buildCommand: bun install && bun run build
     startCommand: bun run server/agent.ts & bunx vite preview --port $PORT --host 0.0.0.0
     envVars:
       - key: NODE_VERSION
