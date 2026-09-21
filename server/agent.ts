@@ -39,7 +39,7 @@ const PORT    = parseInt(process.env.PORT ?? process.env.AGENT_PORT ?? '3001', 1
 const IS_PROD = !!process.env.PORT  // Render always sets PORT; local dev doesn't
 
 // Static file serving (production only — dev uses Vite)
-const DIST_DIR = join(import.meta.dir, '..', 'dist')
+const DIST_DIR = join(process.cwd(), 'dist')
 const MIME: Record<string, string> = {
   '.html': 'text/html',
   '.js':   'application/javascript',
