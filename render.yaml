@@ -1,12 +1,9 @@
 services:
   - type: web
     name: jarawork
-    runtime: node
-    buildCommand: bun install && bun run build
-    startCommand: bun run server/agent.ts
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: NODE_VERSION
-        value: 20
       - key: CIRCLE_DEVELOPER_CONTROLLED_API_KEY
         sync: false
       - key: CIRCLE_ENTITY_SECRET
