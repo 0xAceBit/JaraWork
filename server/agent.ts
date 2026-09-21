@@ -17,9 +17,12 @@ import {
 import { encodeFunctionData, keccak256, toHex } from 'viem'
 import webpush from 'web-push'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, extname } from 'node:path'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
+
+// On Render, PORT is set by the platform. Agent API is always on 3001 internally.
+// The main HTTP server (frontend + API) listens on PORT; agent-only internals stay on 3001.
 
 const API_KEY        = process.env.CIRCLE_DEVELOPER_CONTROLLED_API_KEY ?? ''
 const ENTITY_SECRET  = process.env.CIRCLE_ENTITY_SECRET ?? ''
@@ -31,7 +34,43 @@ const BLOCKCHAIN = 'ARC-TESTNET'
 const AUTO_RELEASE_DELAY_S = parseInt(process.env.AUTO_RELEASE_DELAY_SECONDS ?? '86400', 10)
 const AUTO_REFUND_DELAY_S  = parseInt(process.env.AUTO_REFUND_DELAY_SECONDS  ?? '604800', 10)
 const POLL_MS = parseInt(process.env.AGENT_POLL_MS ?? '60000', 10)
-const PORT    = parseInt(process.env.AGENT_PORT ?? '3001', 10)
+// In production (Render), PORT is the public port. In dev, agent runs on 3001.
+const PORT    = parseInt(process.env.PORT ?? process.env.AGENT_PORT ?? '3001', 10)
+const IS_PROD = !!process.env.PORT  // Render always sets PORT; local dev doesn't
+
+// Static file serving (production only — dev uses Vite)
+const DIST_DIR = join(import.meta.dir, '..', 'dist')
+const MIME: Record<string, string> = {
+  '.html': 'text/html',
+  '.js':   'application/javascript',
+  '.css':  'text/css',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.ico':  'image/x-icon',
+  '.json': 'application/json',
+  '.woff2':'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf':  'font/ttf',
+  '.map':  'application/json',
+}
+
+async function serveStatic(pathname: string): Promise<Response | null> {
+  if (!IS_PROD) return null
+  // Strip leading slash
+  const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
+  const filePath = join(DIST_DIR, rel)
+  const file = Bun.file(filePath)
+  if (await file.exists()) {
+    const mime = MIME[extname(filePath)] ?? 'application/octet-stream'
+    return new Response(file, { headers: { 'Content-Type': mime } })
+  }
+  // SPA fallback — serve index.html for all non-asset routes
+  const index = Bun.file(join(DIST_DIR, 'index.html'))
+  if (await index.exists()) {
+    return new Response(index, { headers: { 'Content-Type': 'text/html' } })
+  }
+  return null
+}
 
 // Low-balance alert config
 const LOW_BALANCE_THRESHOLD = parseFloat(process.env.LOW_BALANCE_THRESHOLD_USDC ?? '5.00')
@@ -720,6 +759,10 @@ Bun.serve({
     if (path === '/ebay/ping')     return new Response(null, { status: process.env.EBAY_CLIENT_ID ? 200 : 503 })
     if (path === '/jumia/orders')  return json({ orders: [], note: 'Set JUMIA_API_KEY etc. in .env.' })
     if (path === '/jumia/ping')    return new Response(null, { status: process.env.JUMIA_API_KEY ? 200 : 503 })
+
+    // Static file serving (production) — SPA fallback for all unmatched routes
+    const staticRes = await serveStatic(path)
+    if (staticRes) return staticRes
 
     return json({ error: 'Not found' }, 404)
   },

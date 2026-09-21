@@ -15,7 +15,7 @@
     "contracts:test": "forge test",
     "agent": "bun run server/agent.ts",
     "build": "vite build",
-    "start": "bun run server/agent.ts & bunx vite preview --port $PORT --host 0.0.0.0"
+    "start": "bun run server/agent.ts"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.18.0",
