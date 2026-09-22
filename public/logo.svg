@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="jGrad" x1="60" y1="10" x2="140" y2="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFB347"/>
+      <stop offset="40%" stop-color="#FF8C00"/>
+      <stop offset="100%" stop-color="#E65C00"/>
+    </linearGradient>
+    <linearGradient id="checkGrad" x1="90" y1="120" x2="155" y2="175" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FFA500"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#00000040"/>
+    </filter>
+  </defs>
+
+  <!-- J body -->
+  <g filter="url(#shadow)">
+    <!-- J stem (document shape with folded corner) -->
+    <path d="M108 12 L148 12 L148 52 L138 52 L138 22 L118 22 L118 12 Z" fill="#FFD080"/>
+    <path d="M108 12 L138 12 L138 22 L148 22 L148 12 Z" fill="none"/>
+    <!-- folded corner -->
+    <path d="M138 12 L148 22 L138 22 Z" fill="#FFB347"/>
+
+    <!-- Main J shape -->
+    <path d="
+      M108 12
+      L138 12
+      L138 22
+      L148 22
+      L148 115
+      Q148 155 115 165
+      Q82 175 68 148
+      L68 135
+      Q78 158 100 155
+      Q128 150 128 120
+      L128 22
+      L108 22
+      Z
+    " fill="url(#jGrad)"/>
+
+    <!-- document lines on upper J -->
+    <rect x="86" y="40" width="42" height="6" rx="3" fill="white" opacity="0.9"/>
+    <rect x="86" y="54" width="42" height="6" rx="3" fill="white" opacity="0.9"/>
+    <rect x="86" y="68" width="30" height="6" rx="3" fill="white" opacity="0.9"/>
+  </g>
+
+  <!-- Checkmark -->
+  <g filter="url(#shadow)">
+    <path d="M88 138 L104 158 L148 118" stroke="url(#checkGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M88 138 L104 158 L148 118" stroke="#1a0a00" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.18"/>
+    <path d="M88 138 L104 158 L148 118" stroke="url(#checkGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

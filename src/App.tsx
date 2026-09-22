@@ -223,16 +223,13 @@ export default function App() {
             onClick={() => setTab('board')}
             className="flex items-center gap-2.5 focus:outline-none"
           >
-            {/* Logo mark — warm amber */}
-            <div
-              className="w-9 h-9 rounded-2xl flex items-center justify-center text-white font-bold text-sm display shrink-0"
-              style={{
-                background: 'linear-gradient(145deg, #e8700a 0%, #a34d00 100%)',
-                boxShadow: '0 3px 12px rgba(232,112,10,0.38)',
-              }}
-            >
-              J
-            </div>
+            {/* Logo mark */}
+            <img
+              src="/logo.svg"
+              alt="JaraWork logo"
+              className="w-9 h-9 rounded-2xl shrink-0 object-contain"
+              style={{ background: '#111', boxShadow: '0 3px 12px rgba(232,112,10,0.38)' }}
+            />
             <div className="leading-tight text-left">
               <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.025em' }}>
                 JaraWork
