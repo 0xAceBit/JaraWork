@@ -3,11 +3,10 @@
  */
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain } from 'wagmi'
 import { useState, useEffect } from 'react'
-import { erc20Abi } from 'viem'
+import { erc20Abi, parseUnits } from 'viem'
 import { arcTestnet } from 'viem/chains'
 import { JARA_WORK_ESCROW, type Order } from '../contracts/jaraWorkEscrow'
 import { getUsdc } from '../onchain-facts'
-import { parseAmount } from '../onchain-money'
 
 const CHAIN_ID = arcTestnet.id
 const usdcFact = getUsdc(CHAIN_ID)
@@ -140,11 +139,11 @@ export function useCreateOrder() {
       switchChain({ chainId: CHAIN_ID })
       return
     }
-    const parsed = parseAmount(CHAIN_ID, usdcAmount)
+    const parsed = parseUnits(usdcAmount, 6)
     writeContract({
       ...JARA_WORK_ESCROW,
       functionName: 'createOrder',
-      args: [orderId, title, description, sourceMarketplace, parsed.raw],
+      args: [orderId, title, description, sourceMarketplace, parsed],
     })
   }
 
