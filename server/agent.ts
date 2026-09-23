@@ -416,16 +416,37 @@ async function readOrderFields(key: string): Promise<OrderFields | null> {
   const padded = key.slice(2).padStart(64, '0')
   const data = await rpcCall('eth_call', [{ to: CONTRACT_ADDRESS, data: `${selector}${padded}` }, 'latest'])
   if (!data || data === '0x') return null
-  const hex = (data as string).slice(2)
-  const word = (i: number) => BigInt('0x' + hex.slice(i * 64, i * 64 + 64))
-  // Tuple head: [0]=orderId offset, [1]=title offset, [2]=desc offset, [3]=mktplace offset,
-  // [4]=amount, [5]=buyer, [6]=worker, [7]=status, [8]=createdAt, [9]=claimedAt, [10]=completedAt, [11]=proof offset
-  return {
-    amount:      word(4),
-    status:      Number(word(7)),
-    createdAt:   word(8),
-    claimedAt:   word(9),
-    completedAt: word(10),
+  try {
+    // Use viem's decodeAbiParameters so dynamic string offsets are handled correctly
+    const { decodeAbiParameters } = await import('viem')
+    const decoded = decodeAbiParameters(
+      [{ type: 'tuple', components: [
+        { name: 'orderId',           type: 'string'  },
+        { name: 'title',             type: 'string'  },
+        { name: 'description',       type: 'string'  },
+        { name: 'sourceMarketplace', type: 'string'  },
+        { name: 'amount',            type: 'uint256' },
+        { name: 'buyer',             type: 'address' },
+        { name: 'worker',            type: 'address' },
+        { name: 'status',            type: 'uint8'   },
+        { name: 'createdAt',         type: 'uint256' },
+        { name: 'claimedAt',         type: 'uint256' },
+        { name: 'completedAt',       type: 'uint256' },
+        { name: 'deliveryProof',     type: 'string'  },
+      ]}],
+      data as `0x${string}`
+    )
+    const o = decoded[0] as Record<string, unknown>
+    return {
+      amount:      o.amount      as bigint,
+      status:      Number(o.status),
+      createdAt:   o.createdAt   as bigint,
+      claimedAt:   o.claimedAt   as bigint,
+      completedAt: o.completedAt as bigint,
+    }
+  } catch (e) {
+    console.error('[Agent] readOrderFields decode error:', (e as Error).message)
+    return null
   }
 }
 

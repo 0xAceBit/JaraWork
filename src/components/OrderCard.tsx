@@ -129,8 +129,8 @@ export default function OrderCard({
 }: Props) {
   const isBuyer  = !!connectedAddress && !!order.buyer  && connectedAddress.toLowerCase() === order.buyer.toLowerCase()
   const isWorker = !!connectedAddress && !!order.worker && connectedAddress.toLowerCase() === order.worker.toLowerCase()
-  const usdcAmount = parseFloat(formatUnits(order.amount, 6)).toFixed(2)
-  const mp = order.sourceMarketplace.toLowerCase()
+  const usdcAmount = order.amount != null ? parseFloat(formatUnits(order.amount, 6)).toFixed(2) : '0.00'
+  const mp = (order.sourceMarketplace ?? '').toLowerCase()
   const hasWorker = order.worker && order.worker !== '0x0000000000000000000000000000000000000000'
 
   const showClaim   = order.status === 0 && !isBuyer && !!onClaim && !!connectedAddress
