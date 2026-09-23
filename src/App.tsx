@@ -178,7 +178,7 @@ export default function App() {
   const { isConnected, address } = useAccount()
   const { data: ownerRaw } = useContractOwner()
   const owner = (ownerRaw as string | undefined) ?? ''
-  const isOwner = !!address && !!owner && address.toLowerCase() === owner.toLowerCase()
+  const isOwner = !!address && !!owner && address.toLowerCase() === (owner).toLowerCase()
 
   // Build tab list — inject Admin tab between Agent and Settings for owners only
   const TABS = isOwner

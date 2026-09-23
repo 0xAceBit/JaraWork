@@ -447,19 +447,27 @@ export function useWorkerReputation(worker: `0x${string}` | undefined): {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 export function parseOrderStruct(raw: unknown): Order {
-  const r = raw as readonly [string, string, string, string, bigint, string, string, number, bigint, bigint, bigint, string]
+  // wagmi v2 decodes named struct outputs as objects with named keys.
+  // Fall back to positional array access for compatibility.
+  const obj = raw as Record<string, unknown>
+  const r   = raw as readonly unknown[]
+
+  function field<T>(name: string, idx: number): T {
+    return (obj[name] !== undefined ? obj[name] : r[idx]) as T
+  }
+
   return {
-    orderId: r[0],
-    title: r[1],
-    description: r[2],
-    sourceMarketplace: r[3],
-    amount: r[4],
-    buyer: r[5],
-    worker: r[6],
-    status: r[7] as Order['status'],
-    createdAt: r[8],
-    claimedAt: r[9],
-    completedAt: r[10],
-    deliveryProof: r[11],
+    orderId:           field<string>('orderId', 0) ?? '',
+    title:             field<string>('title', 1) ?? '',
+    description:       field<string>('description', 2) ?? '',
+    sourceMarketplace: field<string>('sourceMarketplace', 3) ?? '',
+    amount:            field<bigint>('amount', 4) ?? 0n,
+    buyer:             field<string>('buyer', 5) ?? '',
+    worker:            field<string>('worker', 6) ?? '',
+    status:            (field<number>('status', 7) ?? 0) as Order['status'],
+    createdAt:         field<bigint>('createdAt', 8) ?? 0n,
+    claimedAt:         field<bigint>('claimedAt', 9) ?? 0n,
+    completedAt:       field<bigint>('completedAt', 10) ?? 0n,
+    deliveryProof:     field<string>('deliveryProof', 11) ?? '',
   }
 }

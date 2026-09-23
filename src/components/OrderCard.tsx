@@ -102,7 +102,8 @@ interface Props {
   isClaiming?: boolean
 }
 
-function shortAddr(addr: string) {
+function shortAddr(addr: string | undefined) {
+  if (!addr) return '—'
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
@@ -180,7 +181,7 @@ export default function OrderCard({
               {order.title || 'Untitled Order'}
             </p>
             <p className="mono text-xs mt-0.5 truncate" style={{ color: 'var(--subtle)' }}>
-              #{order.orderId.slice(0, 20)}
+              #{(order.orderId ?? '').slice(0, 20)}
             </p>
           </div>
           {/* Prominent USDC amount — reference-inspired: large pill top-right */}

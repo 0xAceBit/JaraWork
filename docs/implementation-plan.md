@@ -1,103 +1,51 @@
-Based on your answers, let me read the relevant skills before generating the plan. Good. I have everything I need. Here is the full implementation plan based on your answers:
+Let me read everything before diagnosing — contract, agent backend, and the live chain state. Now read the `readOrderFields` function after the ABI fix and the `callEscrow` implementation to understand how the agent signs and sends transactions: Now I have the full picture. Let me check the current state of orders on chain and the agent-state.json:I'm in Plan mode. Let me give you the complete diagnosis and course of action based on everything I've read.
 
 ---
 
-## Implementation Plan: JaraWork — Order-to-Earner Marketplace Agent
+## Full Diagnosis
 
-### Summary
-A decentralized gig marketplace that pulls orders from Jaramarket.store (and optionally Amazon, eBay, Jumia via user-provided API keys), broadcasts them as claimable tasks to registered workers/earners, and settles payment in USDC through an on-chain escrow — released only after the buyer confirms delivery.
+### Problem 1: Agent auto-refunds orders immediately (confirmed root cause)
 
----
+The `readOrderFields` fix I wrote uses `decodeAbiParameters` but **the fix hasn't been pushed to Render yet** — you haven't pushed since the `375bdd5` commit. Render is still running the old broken decoder.
 
-### Architecture
+The old broken decoder reads `createdAt` from word index 8 of the raw ABI response. Because the struct has 4 dynamic string fields at the start, word 8 is actually an **ABI offset pointer** (~`0x160` = 352), not a Unix timestamp (~`1748000000`). So `now - 352 > 604800` is always true and every order looks 7+ days old → immediate auto-refund.
 
-- **Blockchain:** Arc Testnet — USDC is the native gas token, making escrow payouts predictable and cheap
-- **Contract:** `JaraWorkEscrow.sol` — handles order creation (by buyer/platform), worker claiming, USDC deposit into escrow, delivery confirmation, and refund/dispute paths
-- **Frontend:** React + Tailwind, four main views: Order Board, My Claims (worker), Create Order (buyer/admin), and API Key Settings (marketplace integrations)
-- **Wallet:** ConnectKit — workers and buyers connect their own wallets
+**This is the #1 bug. Everything else flows from it.**
 
----
+### Problem 2: CreateOrder crashes after tx confirms
 
-### Contract: `JaraWorkEscrow.sol`
+The `onCreated()` callback switches to the Orders tab. React tries to render `OrderCard` for the new order. `order.amount` is `undefined` while wagmi fetches it. `formatUnits(undefined, 6)` throws `toString of undefined` → ErrorBoundary catches it → blank "Something went wrong" screen.
 
-Key functions:
-- `createOrder(orderId, description, usdcAmount)` — buyer deposits USDC into escrow, order appears on board
-- `claimOrder(orderId)` — worker claims an open order (first-come, first-served)
-- `submitDelivery(orderId, proofHash)` — worker marks order done, attaches delivery proof hash
-- `confirmDelivery(orderId)` — buyer releases escrow to worker
-- `refundOrder(orderId)` — buyer can refund if worker hasn't claimed (timeout-protected)
-- `disputeOrder(orderId)` — opens dispute for admin/platform resolution
+**This fix is also staged but not pushed.**
+
+### Problem 3: "order exists" revert
+
+The Order ID field was pre-filled with a static value. Submitting twice → same `keccak256(orderId)` key → contract reverts `"order exists"`.
+
+**This fix is also staged but not pushed.**
 
 ---
 
-### Files to Create / Modify
+## All three fixes are in commit `3fbe6b8` — staged locally, never pushed
 
-1. `contracts/JaraWorkEscrow.sol` — escrow contract with order lifecycle state machine
-2. `src/wagmi.ts` — wagmi + ConnectKit config for Arc Testnet
-3. `src/App.tsx` — top-level shell: routing between views, wallet header
-4. `src/components/OrderBoard.tsx` — live list of open orders workers can claim
-5. `src/components/CreateOrder.tsx` — buyer form: description, USDC amount, source marketplace tag
-6. `src/components/MyOrders.tsx` — worker's claimed orders, submit delivery, track status
-7. `src/components/MarketplaceSettings.tsx` — per-user API key config (Jaramarket, Amazon, eBay, Jumia); keys stored locally in browser, never on-chain
-8. `src/hooks/useEscrow.ts` — wagmi hooks wrapping all contract reads/writes
-9. `src/hooks/useMarketplaceOrders.ts` — polling hook that fetches orders from configured marketplaces using the user's own API keys and pushes them into the contract
-10. `src/lib/marketplaces/jaramarket.ts` — Jaramarket.store REST adapter (polls new orders)
-11. `src/lib/marketplaces/amazon.ts` — Amazon SP-API adapter (requires seller API key)
-12. `src/lib/marketplaces/ebay.ts` — eBay Browse/Fulfillment API adapter
-13. `src/lib/marketplaces/jumia.ts` — Jumia Seller API adapter
-14. `src/lib/marketplaceRegistry.ts` — unified interface all adapters implement
+The push attempts all failed because the GitHub token expired. Every fix since `8a06c8c` is sitting in local commits only. Render is running code from 2 days ago.
 
 ---
 
-### Build Sequence
+## Course of Action
 
-1. **Write and deploy `JaraWorkEscrow.sol`** — escrow state machine, USDC transfer logic, events for order lifecycle; security review included before deploy
-2. **Wire wagmi config** (`src/wagmi.ts`) — Arc Testnet chain, ConnectKit, USDC address from `onchain-facts`
-3. **Build `useEscrow.ts` hook** — reads orders from contract, wraps `createOrder`, `claimOrder`, `submitDelivery`, `confirmDelivery`
-4. **Build `OrderBoard.tsx`** — shows all open/claimed/completed orders from on-chain events; workers claim from here
-5. **Build `CreateOrder.tsx`** — buyer deposits USDC and creates an order, can tag it with marketplace source
-6. **Build `MyOrders.tsx`** — worker dashboard: claimed orders, submit delivery with proof note, track escrow state
-7. **Build marketplace adapters** (Jaramarket first, then Amazon/eBay/Jumia stubs) and `useMarketplaceOrders.ts` polling hook
-8. **Build `MarketplaceSettings.tsx`** — API key input form per platform, stored in `localStorage`; real-time test button per integration
-9. **Wire `App.tsx`** — tab navigation: Order Board / Create Order / My Orders / Settings
+**Step 1 (now): Push all pending commits**
+Add a fresh token to `.env` and say "push it". This sends commits `c777c7c` through `3fbe6b8` to GitHub in one push — 6 commits worth of fixes including all three root causes above.
 
----
+**Step 2 (automatic): Render redeploys**
+Render auto-deploys on push. The new build includes the correct ABI decoder, null guards on OrderCard, and auto-generated order IDs.
 
-### Done When
+**Step 3: Verify the agent is no longer refunding**
+After deploy, create a test order. Watch the Agent tab action log. You should see no `refund_order` entries. The order should stay Open on the board.
 
-- [ ] Worker can connect wallet, see open orders from the board, and claim one
-- [ ] Buyer can connect wallet, fill a form with amount + description, approve + deposit USDC into escrow
-- [ ] Worker submits delivery; buyer confirms; USDC is released to worker's wallet on Arc Testnet
-- [ ] Buyer can get a refund on an unclaimed order
-- [ ] Jaramarket.store adapter polls for new orders and surfaces them on the board (using the user's own API key)
-- [ ] Amazon, eBay, and Jumia adapters accept user-supplied API keys and fetch live orders when keys are present
-- [ ] All API keys stored only in the user's browser — never sent on-chain or to any server
-- [ ] Marketplace settings page lets the user add/remove keys and test each connection
+**Step 4 (if agent still refunds after push)**
+It means Render's agent process has the old `agent-state.json` cached with already-posted keys. Go to Render → JaraWork → **Shell** → run `rm server/agent-state.json` → restart the service. This clears the stale state.
 
 ---
 
-### Important Note on Marketplace API Keys
-
-Each platform (Amazon, eBay, Jumia, Jaramarket) requires its own developer credentials:
-- **Jaramarket** — you will need to expose a REST or webhook endpoint on jaramarket.store
-- **Amazon** — requires Amazon SP-API seller credentials (MWS access key + secret)
-- **eBay** — requires eBay Developer Program app credentials
-- **Jumia** — requires Jumia Seller API key (availability varies by country)
-
-The app will have a Settings screen where workers/buyers paste their own keys. Nothing touches your server — it all runs in the browser.
-
----
-
-## Ready to build?
-
-Switch to **Build mode** to start. The contract will be written and reviewed before anything deploys, and the marketplace adapters will be built starting with Jaramarket, then expanding to Amazon, eBay, and Jumia. Plan saved to `arc-studio-plans/PLAN.md`.
-
-A few things worth flagging before you hit Build:
-
-**On the marketplace API keys question you asked** — yes, users can supply their own API keys from Amazon, eBay, Jumia, and Jaramarket directly in the app. Each worker or buyer enters their own credentials in the Settings screen. Those keys live only in their browser (`localStorage`) and are used client-side to poll for new orders. Nothing is stored on a server or put on-chain. This is the safest and most practical approach since each seller has their own account on those platforms.
-
-**Real-time notifications** — browser polling every 30–60 seconds is the realistic approach here. True push notifications from Amazon/eBay/Jumia require a publicly accessible server endpoint to receive their webhooks, which is outside the browser sandbox. The plan uses polling as the default; if you later want webhooks, that would need a small backend relay server.
-
-**Jaramarket specifically** — you will need to either expose an API endpoint on jaramarket.store or enable webhooks on your store platform (Shopify, WooCommerce, etc.) for the integration to pull live orders. The adapter is built to support both; we can configure the exact endpoint once you confirm how jaramarket.store is set up.
-
-Switch to **Build mode** when ready and everything will be built in the sequence above.
+Add your token to `.env` and say "push it" to get all of this live now.
