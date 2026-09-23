@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useSwitchChain } from 'wagmi'
 import { ConnectKitButton } from 'connectkit'
 import { toast } from 'sonner'
 import { Plus, Loader2 } from 'lucide-react'
@@ -26,7 +26,8 @@ interface Props {
 }
 
 export default function CreateOrder({ prefill, onCreated }: Props) {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chainId: connectedChainId } = useAccount()
+  const { switchChain } = useSwitchChain()
   const { orders: mpOrders, loading: mpLoading, refresh: refreshMp } = useMarketplaceOrders()
 
   const [orderId, setOrderId] = useState(prefill?.externalId ?? '')
@@ -103,11 +104,33 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
     setOrderId(''); setTitle(''); setDescription(''); setMarketplace('manual'); setAmount(''); setStep('form')
   }
 
+  const isWrongNetwork = isConnected && connectedChainId !== CHAIN_ID
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center gap-4 py-12">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>Connect your wallet to create an order</p>
         <ConnectKitButton />
+      </div>
+    )
+  }
+
+  if (isWrongNetwork) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-12">
+        <div className="w-full rounded-2xl p-4 flex flex-col gap-3 text-center" style={{ background: '#fef3c7', border: '1px solid #f59e0b' }}>
+          <p className="font-semibold text-sm" style={{ color: '#92400e' }}>Wrong network</p>
+          <p className="text-xs" style={{ color: '#b45309' }}>
+            JaraWork runs on Arc Testnet. Your wallet is on a different network.
+          </p>
+          <button
+            onClick={() => switchChain({ chainId: CHAIN_ID })}
+            className="self-center py-2 px-6 rounded-xl text-sm font-semibold"
+            style={{ background: '#f59e0b', color: '#fff' }}
+          >
+            Switch to Arc Testnet
+          </button>
+        </div>
       </div>
     )
   }
