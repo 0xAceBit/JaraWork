@@ -30,7 +30,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
   const { switchChain } = useSwitchChain()
   const { orders: mpOrders, loading: mpLoading, refresh: refreshMp } = useMarketplaceOrders()
 
-  const [orderId, setOrderId] = useState(prefill?.externalId ?? '')
+  const [orderId, setOrderId] = useState(prefill?.externalId ?? `manual-${Date.now()}`)
   const [title, setTitle] = useState(prefill?.title ?? '')
   const [description, setDescription] = useState(prefill?.description ?? '')
   const [marketplace, setMarketplace] = useState<string>(prefill?.sourceMarketplace ?? 'manual')
@@ -62,14 +62,24 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
           <a href={buildTxExplorerUrl(CHAIN_ID, approveHash)} target="_blank" rel="noopener" className="underline">View on explorer</a>
         ) : undefined,
       })
-      void refetchAllowance()
-      setStep('create')
+      // Refetch allowance then proceed — small delay lets the node index the approval
+      setTimeout(() => {
+        void refetchAllowance().then(() => setStep('create'))
+      }, 1500)
     }
   }, [approveSuccess, approveHash, refetchAllowance])
 
   useEffect(() => {
     if (approveError) toast.error('Approval failed', { description: (approveError as Error).message })
   }, [approveError])
+
+  // Auto-trigger create after approve succeeds and step flips to 'create'
+  useEffect(() => {
+    if (step === 'create' && !creating && !createConfirming && !createSuccess) {
+      create(orderId, title, description, marketplace, amount)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   useEffect(() => {
     if (createSuccess) {
@@ -90,18 +100,19 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
   const isFormValid = orderId.trim() && title.trim() && amount && parsedAmount !== null
 
   function handleSubmit() {
-    if (!isFormValid) return
+    if (!isFormValid || parsedAmount === null) return
     if (needsApprove) {
       setStep('approve')
-      approve(parsedAmount)
+      // Approve MaxUint256 so future orders never hit stale-allowance failures
+      approve(BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     } else {
       setStep('create')
-      create(orderId, title, description, marketplace, amount)
+      // effect above picks up step==='create' and fires create()
     }
   }
 
   function reset() {
-    setOrderId(''); setTitle(''); setDescription(''); setMarketplace('manual'); setAmount(''); setStep('form')
+    setOrderId(`manual-${Date.now()}`); setTitle(''); setDescription(''); setMarketplace('manual'); setAmount(''); setStep('form')
   }
 
   const isWrongNetwork = isConnected && connectedChainId !== CHAIN_ID
@@ -209,7 +220,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Order ID</label>
+            <label className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Order ID <span style={{ color: 'var(--accent)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(must be unique)</span></label>
             <input
               value={orderId}
               onChange={(e) => setOrderId(e.target.value)}
@@ -217,6 +228,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
               className="rounded-xl px-3 py-2.5 text-sm outline-none"
               style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--ink)' }}
             />
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Auto-generated. Change only if you have a specific order reference.</p>
           </div>
         </div>
 
