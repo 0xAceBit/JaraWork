@@ -127,8 +127,8 @@ export default function OrderCard({
   orderKey, order, connectedAddress,
   onClaim, onSubmitDelivery, onConfirmDelivery, onRefund, onDispute, isClaiming,
 }: Props) {
-  const isBuyer  = connectedAddress?.toLowerCase() === order.buyer.toLowerCase()
-  const isWorker = connectedAddress?.toLowerCase() === order.worker.toLowerCase()
+  const isBuyer  = !!connectedAddress && !!order.buyer  && connectedAddress.toLowerCase() === order.buyer.toLowerCase()
+  const isWorker = !!connectedAddress && !!order.worker && connectedAddress.toLowerCase() === order.worker.toLowerCase()
   const usdcAmount = parseFloat(formatUnits(order.amount, 6)).toFixed(2)
   const mp = order.sourceMarketplace.toLowerCase()
   const hasWorker = order.worker && order.worker !== '0x0000000000000000000000000000000000000000'

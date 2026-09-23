@@ -16,15 +16,15 @@ const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary>
-      <WagmiProvider config={config}>
-        <QueryClientProvider client={queryClient}>
-          <ConnectKitProvider>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <ConnectKitProvider>
+          <ErrorBoundary>
             <App />
-            <Toaster position="top-center" />
-          </ConnectKitProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
-    </ErrorBoundary>
+          </ErrorBoundary>
+          <Toaster position="top-center" />
+        </ConnectKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   </StrictMode>,
 )
