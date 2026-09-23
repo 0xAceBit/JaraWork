@@ -174,7 +174,7 @@ function PageHeader({ label, sub }: { label: string; sub: string }) {
 /* ─── App ───────────────────────────────────────────────────────── */
 export default function App() {
   const [tab, setTab] = useState<Tab>('board')
-  const [postOrderCreated, setPostOrderCreated] = useState(0)
+  const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
   const { isConnected, address } = useAccount()
   const { data: ownerRaw } = useContractOwner()
   const owner = (ownerRaw as string | undefined) ?? ''
@@ -253,7 +253,7 @@ export default function App() {
                 sub="Claim an order to earn USDC. Payment releases from escrow once delivery is confirmed."
               />
           }
-          <OrderBoard key={postOrderCreated} />
+          <OrderBoard externalRefreshSeed={boardRefreshSeed} />
         </section>
 
         {/* All other tabs — rendered only when active so they don't waste RPC calls */}
@@ -277,7 +277,7 @@ export default function App() {
               >
                 <CreateOrder
                   onCreated={() => {
-                    setPostOrderCreated(n => n + 1)
+                    setBoardRefreshSeed(n => n + 1)
                     setTab('board')
                   }}
                 />

@@ -376,15 +376,26 @@ interface Props {
   statusFilter?: number | null
   buyerFilter?: `0x${string}`
   workerFilter?: `0x${string}`
+  externalRefreshSeed?: number
 }
 
-export default function OrderBoard({ statusFilter: _statusFilter, buyerFilter: _buyerFilter, workerFilter: _workerFilter }: Props) {
+export default function OrderBoard({ statusFilter: _statusFilter, buyerFilter: _buyerFilter, workerFilter: _workerFilter, externalRefreshSeed }: Props) {
   const { address } = useAccount()
   const { allKeys, total, isLoading, hasMore, loadMore, refresh } = useAccumulatedOpenOrders()
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cardRevision, setCardRevision] = useState(0)
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const prevSeedRef = useState(externalRefreshSeed ?? 0)
+
+  // Trigger refresh when parent increments the seed (e.g. after posting a new order)
+  useEffect(() => {
+    if (externalRefreshSeed !== undefined && externalRefreshSeed !== prevSeedRef[0]) {
+      prevSeedRef[1](externalRefreshSeed)
+      void refresh()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalRefreshSeed])
 
   // Map of orderKey → parsed Order (populated as cards render)
   const [orderDataMap, setOrderDataMap] = useState<Map<string, Order | null>>(new Map())
