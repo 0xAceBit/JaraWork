@@ -22,7 +22,8 @@ export interface MarketplaceKeys {
   amazon?: { accessKey: string; secretKey: string; sellerId: string; marketplaceId: string }
   ebay?: { clientId: string; clientSecret: string }
   jumia?: { apiKey: string; country: string }
+  shopify?: { shop: string; connected: boolean }
 }
 
-export const MARKETPLACE_IDS = ['jaramarket', 'amazon', 'ebay', 'jumia', 'manual'] as const
+export const MARKETPLACE_IDS = ['jaramarket', 'amazon', 'ebay', 'jumia', 'shopify', 'manual'] as const
 export type MarketplaceId = typeof MARKETPLACE_IDS[number]

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { CheckCircle, XCircle, Loader2, Key, Trash2 } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Key, Trash2, ExternalLink } from 'lucide-react'
 import { loadMarketplaceKeys, saveMarketplaceKeys } from '../lib/marketplaces/storage'
 import { getAdapter } from '../lib/marketplaces/registry'
 import type { MarketplaceKeys } from '../lib/marketplaces/types'
@@ -10,6 +10,23 @@ type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 export default function MarketplaceSettings() {
   const [keys, setKeys] = useState<MarketplaceKeys>(loadMarketplaceKeys)
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
+  const [shopInput, setShopInput] = useState(keys.shopify?.shop ?? '')
+
+  // Handle redirect back from Shopify OAuth (?shopify_connected=mystore.myshopify.com)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connectedShop = params.get('shopify_connected')
+    if (connectedShop) {
+      const updated = { ...keys, shopify: { shop: connectedShop, connected: true } }
+      setKeys(updated)
+      setShopInput(connectedShop)
+      saveMarketplaceKeys(updated)
+      toast.success(`Shopify connected: ${connectedShop}`)
+      // Clean the URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function save(updated: MarketplaceKeys) {
     setKeys(updated)
@@ -136,6 +153,19 @@ export default function MarketplaceSettings() {
         />
         <Note>API endpoint: <code>sellercenter-api.{'{country}'}.jumia.com</code>. Falls back to relay if CORS blocks direct access.</Note>
       </Section>
+
+      {/* Shopify — OAuth flow */}
+      <ShopifySection
+        connected={keys.shopify?.connected ?? false}
+        shop={keys.shopify?.shop ?? ''}
+        shopInput={shopInput}
+        setShopInput={setShopInput}
+        onDisconnect={() => {
+          const updated = { ...keys, shopify: undefined }
+          save(updated)
+          setShopInput('')
+        }}
+      />
     </div>
   )
 }
@@ -242,5 +272,103 @@ function Note({ children }: { children: React.ReactNode }) {
     <p className="text-xs px-3 py-2 rounded-xl" style={{ background: '#f0f9ff', color: '#0369a1' }}>
       {children}
     </p>
+  )
+}
+
+// ─── Shopify OAuth section ─────────────────────────────────────────────────────
+
+function ShopifySection({
+  connected, shop, shopInput, setShopInput, onDisconnect,
+}: {
+  connected: boolean
+  shop: string
+  shopInput: string
+  setShopInput: (v: string) => void
+  onDisconnect: () => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  function handleConnect() {
+    const raw = shopInput.trim().toLowerCase()
+    if (!raw) { toast.error('Enter your Shopify store domain first'); return }
+    const domain = raw.endsWith('.myshopify.com') ? raw : `${raw}.myshopify.com`
+    window.location.href = `/api/shopify/install?shop=${encodeURIComponent(domain)}`
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left"
+        style={{ background: 'var(--surface-strong)' }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Key size={16} style={{ color: 'var(--muted)' }} />
+          <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>Shopify</span>
+          {connected && (
+            <span className="text-xs px-2 py-0.5 rounded-full text-green-700 bg-green-50">
+              Connected{shop ? `: ${shop}` : ''}
+            </span>
+          )}
+        </div>
+        <span className="text-xs" style={{ color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 py-4 flex flex-col gap-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+          {connected ? (
+            <>
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
+                <CheckCircle size={15} />
+                <span>Connected to <strong>{shop}</strong></span>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                The agent is polling this store every cycle for unfulfilled orders.
+              </p>
+              <button
+                onClick={onDisconnect}
+                className="flex items-center gap-1 self-start py-2 px-3 rounded-xl text-xs text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={12} /> Disconnect
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+                  Your Shopify Store Domain
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={shopInput}
+                    onChange={e => setShopInput(e.target.value)}
+                    placeholder="mystore.myshopify.com"
+                    className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none"
+                    style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--ink)' }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleConnect() }}
+                  />
+                </div>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                  Enter just the store name (e.g. <code>mystore</code>) or the full domain.
+                </p>
+              </div>
+              <Note>
+                Clicking Connect redirects you to Shopify to approve access. No password or API key needed — just log in to your store.
+              </Note>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={handleConnect}
+                  className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold text-white transition-colors"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  <ExternalLink size={12} /> Connect Shopify
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

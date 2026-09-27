@@ -6,6 +6,7 @@ import { jaramarketAdapter } from './jaramarket'
 import { amazonAdapter } from './amazon'
 import { ebayAdapter } from './ebay'
 import { jumiaAdapter } from './jumia'
+import { shopifyAdapter } from './shopify'
 import type { MarketplaceAdapter } from './types'
 
 export const ADAPTERS: Record<string, MarketplaceAdapter> = {
@@ -13,6 +14,7 @@ export const ADAPTERS: Record<string, MarketplaceAdapter> = {
   amazon: amazonAdapter,
   ebay: ebayAdapter,
   jumia: jumiaAdapter,
+  shopify: shopifyAdapter,
 }
 
 export function getAdapter(id: string): MarketplaceAdapter | undefined {

@@ -58,7 +58,7 @@ async function serveStatic(pathname: string): Promise<Response | null> {
   // Always try to serve static files when dist/ exists (both prod and any env with a build)
   const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
   // Don't try to serve API paths as static files
-  if (rel.startsWith('agent/') || rel.startsWith('amazon/') || rel.startsWith('ebay/') || rel.startsWith('jumia/') || rel === 'health') return null
+  if (rel.startsWith('agent/') || rel.startsWith('amazon/') || rel.startsWith('ebay/') || rel.startsWith('jumia/') || rel.startsWith('shopify/') || rel === 'health') return null
   const filePath = join(DIST_DIR, rel)
   const file = Bun.file(filePath)
   if (await file.exists()) {
@@ -233,6 +233,11 @@ function saveState() {
     console.error('[Agent] Failed to persist state:', (e as Error).message)
   }
 }
+
+// ─── Shopify token store (in-memory, keyed by shop domain) ───────────────────
+// Tokens survive until the server restarts. For production persistence,
+// move this to agent-state.json (same pattern as postedKeys).
+const shopifyTokens = new Map<string, string>()
 
 // ─── Dedup: track external order IDs already posted on-chain ─────────────────
 
@@ -463,17 +468,30 @@ async function processMarketplaceOrders() {
   const { amazonAdapter }     = await import('../src/lib/marketplaces/amazon.ts')
   const { ebayAdapter }       = await import('../src/lib/marketplaces/ebay.ts')
   const { jumiaAdapter }      = await import('../src/lib/marketplaces/jumia.ts')
+  const { shopifyAdapter }    = await import('../src/lib/marketplaces/shopify.ts')
 
-  const adapters = [jaramarketAdapter, amazonAdapter, ebayAdapter, jumiaAdapter]
+  const adapters = [jaramarketAdapter, amazonAdapter, ebayAdapter, jumiaAdapter, shopifyAdapter]
+
+  // For Shopify, one entry per connected shop — fan out across all connected shops
+  const shopifyEntries: { apiKey: string; extra: Record<string, string> }[] = Array.from(shopifyTokens.entries())
+    .map(([shop, token]) => ({ apiKey: token, extra: { shop } }))
+
   const serverCfg: Record<string, { apiKey: string; extra: Record<string, string> }> = {
     jaramarket: { apiKey: process.env.JARAMARKET_API_KEY ?? '', extra: { storeUrl: process.env.JARAMARKET_STORE_URL ?? '' } },
     amazon:     { apiKey: process.env.AMAZON_ACCESS_KEY  ?? '', extra: { sellerId: process.env.AMAZON_SELLER_ID ?? '', marketplaceId: process.env.AMAZON_MARKETPLACE_ID ?? '' } },
     ebay:       { apiKey: process.env.EBAY_CLIENT_ID     ?? '', extra: { clientSecret: process.env.EBAY_CLIENT_SECRET ?? '' } },
     jumia:      { apiKey: process.env.JUMIA_API_KEY      ?? '', extra: { country: process.env.JUMIA_COUNTRY ?? 'ng' } },
+    // Shopify: handled separately below (multiple shops possible)
+    shopify:    { apiKey: '', extra: {} },
   }
 
   for (const adapter of adapters) {
-    const cfg = serverCfg[adapter.id]
+    // Shopify fans out per connected shop
+    const cfgList = adapter.id === 'shopify'
+      ? shopifyEntries
+      : [serverCfg[adapter.id]]
+
+    for (const cfg of cfgList) {
     if (!cfg?.apiKey) continue
 
     let orders: Array<{ externalId: string; title: string; description: string; usdcAmount: string; sourceMarketplace: string }> = []
@@ -521,6 +539,7 @@ async function processMarketplaceOrders() {
         }
       }
     }
+    } // end cfgList loop
   }
 }
 
@@ -774,6 +793,82 @@ Bun.serve({
     if (path === '/agent/run' && req.method === 'POST') {
       void runCycle()
       return json({ ok: true, message: 'Cycle triggered' })
+    }
+
+    // ── Shopify OAuth ──────────────────────────────────────────────────────────
+    // Step 1: Initiate OAuth — redirect user to Shopify consent page
+    // GET /shopify/install?shop=mystore.myshopify.com
+    if (path === '/shopify/install' && req.method === 'GET') {
+      const shop = url.searchParams.get('shop') ?? ''
+      if (!shop || !shop.endsWith('.myshopify.com')) {
+        return new Response('Missing or invalid shop parameter (must end in .myshopify.com)', { status: 400 })
+      }
+      const clientId = process.env.SHOPIFY_CLIENT_ID ?? ''
+      if (!clientId) return new Response('SHOPIFY_CLIENT_ID not configured on server', { status: 503 })
+      const redirectUri = encodeURIComponent(`${process.env.APP_URL ?? 'https://jarawork.onrender.com'}/api/shopify/callback`)
+      const scopes = 'read_orders,read_fulfillments'
+      const state = Buffer.from(`${Date.now()}-${shop}`).toString('base64')
+      const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`
+      return Response.redirect(authUrl, 302)
+    }
+
+    // Step 2: Callback — exchange code for access token, store per shop
+    // GET /shopify/callback?shop=...&code=...&state=...
+    if (path === '/shopify/callback' && req.method === 'GET') {
+      const shop = url.searchParams.get('shop') ?? ''
+      const code = url.searchParams.get('code') ?? ''
+      const clientId     = process.env.SHOPIFY_CLIENT_ID ?? ''
+      const clientSecret = process.env.SHOPIFY_CLIENT_SECRET ?? ''
+      if (!shop || !code || !clientId || !clientSecret) {
+        return new Response('Missing required parameters or server config', { status: 400 })
+      }
+      try {
+        const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+        })
+        if (!tokenRes.ok) throw new Error(`Shopify token exchange failed: ${tokenRes.status}`)
+        const tokenData = await tokenRes.json() as { access_token?: string }
+        const accessToken = tokenData.access_token ?? ''
+        if (!accessToken) throw new Error('No access_token in Shopify response')
+        // Store token in memory keyed by shop domain
+        shopifyTokens.set(shop, accessToken)
+        logAction({ timestamp: Date.now(), type: 'info', message: `Shopify connected: ${shop}` })
+        // Redirect back to app with success flag
+        const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+        return Response.redirect(`${appUrl}/?shopify_connected=${encodeURIComponent(shop)}`, 302)
+      } catch (e) {
+        logAction({ timestamp: Date.now(), type: 'error', message: `Shopify OAuth error: ${(e as Error).message}` })
+        return new Response(`Shopify auth failed: ${(e as Error).message}`, { status: 500 })
+      }
+    }
+
+    // Ping — returns 200 if a token is stored for this shop
+    if (path === '/shopify/ping' && req.method === 'GET') {
+      const shop = url.searchParams.get('shop') ?? ''
+      return new Response(null, { status: shopifyTokens.has(shop) ? 200 : 503 })
+    }
+
+    // Orders — returns fulfilled orders for a connected shop
+    if (path === '/shopify/orders' && req.method === 'GET') {
+      const shop = url.searchParams.get('shop') ?? ''
+      const token = shopifyTokens.get(shop)
+      if (!token) return json({ error: 'Shop not connected. Complete OAuth first.' }, 401)
+      try {
+        const res = await fetch(
+          `https://${shop}/admin/api/2024-01/orders.json?status=any&fulfillment_status=unfulfilled&limit=50`,
+          { headers: { 'X-Shopify-Access-Token': token } }
+        )
+        if (!res.ok) {
+          if (res.status === 401) shopifyTokens.delete(shop)  // token expired — force re-auth
+          throw new Error(`Shopify orders API returned ${res.status}`)
+        }
+        const data = await res.json() as { orders?: unknown[] }
+        return json({ orders: data.orders ?? [] })
+      } catch (e) {
+        return json({ error: (e as Error).message }, 500)
+      }
     }
 
     // Marketplace relays (stubs — configure server-side API keys in .env)
