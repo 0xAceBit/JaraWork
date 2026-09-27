@@ -46,30 +46,36 @@ export function useMarketplaceOrders(): MarketplaceFeed {
       }
     }
 
-    // Amazon
-    if (keys.amazon) {
-      const cfg = keys.amazon
-      const adapter = getAdapter('amazon')
-      if (adapter) {
-        tasks.push(
-          adapter.fetchOrders(cfg.accessKey, { sellerId: cfg.sellerId, marketplaceId: cfg.marketplaceId })
-            .then((fetched) => { all.push(...fetched) })
-            .catch((e: unknown) => { errors.push(`amazon: ${(e as Error).message}`) })
-        )
-      }
+    // Amazon — token held server-side; fetch via relay
+    if (keys.amazon?.connected) {
+      tasks.push(
+        fetch('/api/amazon/orders')
+          .then(r => r.json() as Promise<{ orders?: unknown[] }>)
+          .then(data => {
+            const adapter = getAdapter('amazon')
+            if (adapter && data.orders?.length) {
+              return adapter.fetchOrders('__relay__', {})
+                .then(fetched => { all.push(...fetched) })
+            }
+          })
+          .catch((e: unknown) => { errors.push(`amazon: ${(e as Error).message}`) })
+      )
     }
 
-    // eBay
-    if (keys.ebay) {
-      const cfg = keys.ebay
-      const adapter = getAdapter('ebay')
-      if (adapter) {
-        tasks.push(
-          adapter.fetchOrders(cfg.clientId, { clientSecret: cfg.clientSecret })
-            .then((fetched) => { all.push(...fetched) })
-            .catch((e: unknown) => { errors.push(`ebay: ${(e as Error).message}`) })
-        )
-      }
+    // eBay — token held server-side; fetch via relay
+    if (keys.ebay?.connected) {
+      tasks.push(
+        fetch('/api/ebay/orders')
+          .then(r => r.json() as Promise<{ orders?: unknown[] }>)
+          .then(data => {
+            const adapter = getAdapter('ebay')
+            if (adapter && data.orders?.length) {
+              return adapter.fetchOrders('__relay__', {})
+                .then(fetched => { all.push(...fetched) })
+            }
+          })
+          .catch((e: unknown) => { errors.push(`ebay: ${(e as Error).message}`) })
+      )
     }
 
     // Jumia

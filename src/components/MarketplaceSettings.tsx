@@ -12,20 +12,38 @@ export default function MarketplaceSettings() {
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
   const [shopInput, setShopInput] = useState(keys.shopify?.shop ?? '')
 
-  // Handle redirect back from Shopify OAuth (?shopify_connected=mystore.myshopify.com)
+  // Handle redirect-back query params from all OAuth flows
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    let updated = { ...keys }
+    let changed = false
+
     const connectedShop = params.get('shopify_connected')
     if (connectedShop) {
-      const updated = { ...keys, shopify: { shop: connectedShop, connected: true } }
-      setKeys(updated)
+      updated = { ...updated, shopify: { shop: connectedShop, connected: true } }
       setShopInput(connectedShop)
-      saveMarketplaceKeys(updated)
       toast.success(`Shopify connected: ${connectedShop}`)
-      // Clean the URL
+      changed = true
+    }
+
+    if (params.get('ebay_connected') === 'true') {
+      updated = { ...updated, ebay: { connected: true } }
+      toast.success('eBay connected successfully')
+      changed = true
+    }
+
+    if (params.get('amazon_connected') === 'true') {
+      updated = { ...updated, amazon: { connected: true } }
+      toast.success('Amazon SP-API connected successfully')
+      changed = true
+    }
+
+    if (changed) {
+      setKeys(updated)
+      saveMarketplaceKeys(updated)
       window.history.replaceState({}, '', window.location.pathname)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function save(updated: MarketplaceKeys) {
@@ -34,7 +52,21 @@ export default function MarketplaceSettings() {
     toast.success('Settings saved')
   }
 
+  async function testOAuthPlatform(platform: string) {
+    setTestStates(s => ({ ...s, [platform]: 'testing' }))
+    try {
+      const res = await fetch(`/api/${platform}/ping`)
+      setTestStates(s => ({ ...s, [platform]: res.ok ? 'ok' : 'fail' }))
+    } catch {
+      setTestStates(s => ({ ...s, [platform]: 'fail' }))
+    }
+  }
+
   async function testConnection(platform: string) {
+    // OAuth platforms ping the server-side token
+    if (['ebay', 'amazon', 'shopify'].includes(platform)) {
+      return testOAuthPlatform(platform)
+    }
     const adapter = getAdapter(platform)
     if (!adapter) return
     setTestStates(s => ({ ...s, [platform]: 'testing' }))
@@ -46,12 +78,6 @@ export default function MarketplaceSettings() {
     if (platform === 'jaramarket') {
       apiKey = k.jaramarket?.apiKey ?? ''
       extra = { storeUrl: k.jaramarket?.storeUrl ?? '' }
-    } else if (platform === 'amazon') {
-      apiKey = k.amazon?.accessKey ?? ''
-      extra = { sellerId: k.amazon?.sellerId ?? '', marketplaceId: k.amazon?.marketplaceId ?? '' }
-    } else if (platform === 'ebay') {
-      apiKey = k.ebay?.clientId ?? ''
-      extra = { clientSecret: k.ebay?.clientSecret ?? '' }
     } else if (platform === 'jumia') {
       apiKey = k.jumia?.apiKey ?? ''
       extra = { country: k.jumia?.country ?? 'ng' }
@@ -76,7 +102,7 @@ export default function MarketplaceSettings() {
       <div>
         <h3 className="display font-semibold text-base" style={{ color: 'var(--ink)' }}>Marketplace Connections</h3>
         <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-          API keys are stored only in your browser and never shared with any server or put on-chain.
+          Connect your seller accounts. OAuth platforms (Shopify, eBay, Amazon) redirect you to approve access — no API key needed on your end.
         </p>
       </div>
 
@@ -96,49 +122,47 @@ export default function MarketplaceSettings() {
         <Note>Point to your store&apos;s REST API. The adapter calls <code>/api/orders?status=pending</code>.</Note>
       </Section>
 
-      {/* Amazon */}
-      <Section title="Amazon" platform="amazon" testState={testStates.amazon ?? 'idle'}
-        onTest={() => { void testConnection('amazon') }} onRemove={() => removeKeys('amazon')}>
-        <Field label="SP-API Access Key" type="password"
-          value={keys.amazon?.accessKey ?? ''}
-          onChange={(v) => save({ ...keys, amazon: { ...keys.amazon ?? { secretKey: '', sellerId: '', marketplaceId: '' }, accessKey: v } })}
-          placeholder="AKIA…"
-        />
-        <Field label="SP-API Secret Key" type="password"
-          value={keys.amazon?.secretKey ?? ''}
-          onChange={(v) => save({ ...keys, amazon: { ...keys.amazon ?? { accessKey: '', sellerId: '', marketplaceId: '' }, secretKey: v } })}
-          placeholder="Secret"
-        />
-        <Field label="Seller ID" type="text"
-          value={keys.amazon?.sellerId ?? ''}
-          onChange={(v) => save({ ...keys, amazon: { ...keys.amazon ?? { accessKey: '', secretKey: '', marketplaceId: '' }, sellerId: v } })}
-          placeholder="A1B2C3D4E5"
-        />
-        <Field label="Marketplace ID" type="text"
-          value={keys.amazon?.marketplaceId ?? 'ATVPDKIKX0DER'}
-          onChange={(v) => save({ ...keys, amazon: { ...keys.amazon ?? { accessKey: '', secretKey: '', sellerId: '' }, marketplaceId: v } })}
-          placeholder="ATVPDKIKX0DER (US)"
-        />
-        <Note>Requires a server-side relay at <code>/api/amazon/orders</code> to handle SigV4 signing. See docs.</Note>
-      </Section>
+      {/* Amazon — OAuth */}
+      <OAuthSection
+        title="Amazon"
+        platform="amazon"
+        connected={!!(keys.amazon as { connected?: boolean } | undefined)?.connected}
+        testState={testStates.amazon ?? 'idle'}
+        onConnect={() => { window.location.href = '/api/amazon/install' }}
+        onTest={() => { void testConnection('amazon') }}
+        onDisconnect={() => removeKeys('amazon')}
+        connectLabel="Connect Amazon Seller Account"
+        connectedNote="The agent is polling your Amazon Seller Central for Unshipped orders every cycle."
+        pendingNote={
+          <>
+            Clicking Connect redirects you to Amazon Seller Central to approve access.
+            Your Client ID and Secret are stored server-side — you only need to approve once.{' '}
+            <strong>Note:</strong> Amazon SP-API approval may take 1–3 days if you have not applied yet.
+          </>
+        }
+      />
 
-      {/* eBay */}
-      <Section title="eBay" platform="ebay" testState={testStates.ebay ?? 'idle'}
-        onTest={() => { void testConnection('ebay') }} onRemove={() => removeKeys('ebay')}>
-        <Field label="Client ID" type="text"
-          value={keys.ebay?.clientId ?? ''}
-          onChange={(v) => save({ ...keys, ebay: { clientId: v, clientSecret: keys.ebay?.clientSecret ?? '' } })}
-          placeholder="eBay Developer App Client ID"
-        />
-        <Field label="Client Secret" type="password"
-          value={keys.ebay?.clientSecret ?? ''}
-          onChange={(v) => save({ ...keys, ebay: { clientId: keys.ebay?.clientId ?? '', clientSecret: v } })}
-          placeholder="eBay Developer App Secret"
-        />
-        <Note>Requires a relay at <code>/api/ebay/orders</code> to handle OAuth2. See eBay Developer Program.</Note>
-      </Section>
+      {/* eBay — OAuth */}
+      <OAuthSection
+        title="eBay"
+        platform="ebay"
+        connected={!!(keys.ebay as { connected?: boolean } | undefined)?.connected}
+        testState={testStates.ebay ?? 'idle'}
+        onConnect={() => { window.location.href = '/api/ebay/install' }}
+        onTest={() => { void testConnection('ebay') }}
+        onDisconnect={() => removeKeys('ebay')}
+        connectLabel="Connect eBay Seller Account"
+        connectedNote="The agent is polling your eBay Fulfillment API for orders awaiting shipment."
+        pendingNote={
+          <>
+            Clicking Connect redirects you to eBay to approve access.
+            Your credentials are stored server-side.{' '}
+            <strong>Note:</strong> eBay developer account approval may take 1 business day.
+          </>
+        }
+      />
 
-      {/* Jumia */}
+      {/* Jumia — key paste (no public OAuth) */}
       <Section title="Jumia" platform="jumia" testState={testStates.jumia ?? 'idle'}
         onTest={() => { void testConnection('jumia') }} onRemove={() => removeKeys('jumia')}>
         <Field label="API Key" type="password"
@@ -151,18 +175,22 @@ export default function MarketplaceSettings() {
           onChange={(v) => save({ ...keys, jumia: { apiKey: keys.jumia?.apiKey ?? '', country: v } })}
           placeholder="ng, ke, gh, eg, ma, cm, ci, tz, ug, za"
         />
-        <Note>API endpoint: <code>sellercenter-api.{'{country}'}.jumia.com</code>. Falls back to relay if CORS blocks direct access.</Note>
+        <Note>
+          Jumia does not have a public OAuth API. Your API key is issued directly by your Jumia account manager.
+          It is stored only in your browser.
+        </Note>
       </Section>
 
-      {/* Shopify — OAuth flow */}
+      {/* Shopify — OAuth */}
       <ShopifySection
         connected={keys.shopify?.connected ?? false}
         shop={keys.shopify?.shop ?? ''}
         shopInput={shopInput}
         setShopInput={setShopInput}
+        testState={testStates.shopify ?? 'idle'}
+        onTest={() => { void testConnection('shopify') }}
         onDisconnect={() => {
-          const updated = { ...keys, shopify: undefined }
-          save(updated)
+          removeKeys('shopify')
           setShopInput('')
         }}
       />
@@ -186,7 +214,6 @@ function Section({
 
   return (
     <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-      {/* Header */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-5 py-4 text-left"
@@ -201,7 +228,6 @@ function Section({
         <span className="text-xs" style={{ color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
       </button>
 
-      {/* Body */}
       {open && (
         <div className="px-5 py-4 flex flex-col gap-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
           {children}
@@ -232,6 +258,88 @@ function Section({
               Remove
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Generic OAuth section (eBay, Amazon) ──────────────────────────────────────
+
+function OAuthSection({
+  title, platform: _platform, connected, testState,
+  onConnect, onTest, onDisconnect, connectLabel, connectedNote, pendingNote,
+}: {
+  title: string
+  platform: string
+  connected: boolean
+  testState: TestState
+  onConnect: () => void
+  onTest: () => void
+  onDisconnect: () => void
+  connectLabel: string
+  connectedNote: string
+  pendingNote: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left"
+        style={{ background: 'var(--surface-strong)' }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Key size={16} style={{ color: 'var(--muted)' }} />
+          <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{title}</span>
+          {connected && <span className="text-xs px-2 py-0.5 rounded-full text-green-700 bg-green-50">Connected</span>}
+          {testState === 'fail' && <span className="text-xs px-2 py-0.5 rounded-full text-red-700 bg-red-50">Failed</span>}
+        </div>
+        <span className="text-xs" style={{ color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 py-4 flex flex-col gap-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+          {connected ? (
+            <>
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
+                <CheckCircle size={15} />
+                <span>{connectedNote}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={onTest}
+                  disabled={testState === 'testing'}
+                  className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold border transition-colors"
+                  style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                >
+                  {testState === 'testing' ? <Loader2 size={12} className="animate-spin" /> : <TestIconInline state={testState} />}
+                  {testState === 'testing' ? 'Checking…' : 'Ping server'}
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={onDisconnect}
+                  className="flex items-center gap-1 py-2 px-3 rounded-xl text-xs text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={12} /> Disconnect
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Note>{pendingNote}</Note>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={onConnect}
+                  className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold text-white transition-colors"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  <ExternalLink size={12} /> {connectLabel}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -278,12 +386,14 @@ function Note({ children }: { children: React.ReactNode }) {
 // ─── Shopify OAuth section ─────────────────────────────────────────────────────
 
 function ShopifySection({
-  connected, shop, shopInput, setShopInput, onDisconnect,
+  connected, shop, shopInput, setShopInput, testState, onTest, onDisconnect,
 }: {
   connected: boolean
   shop: string
   shopInput: string
   setShopInput: (v: string) => void
+  testState: TestState
+  onTest: () => void
   onDisconnect: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -310,6 +420,7 @@ function ShopifySection({
               Connected{shop ? `: ${shop}` : ''}
             </span>
           )}
+          {testState === 'fail' && <span className="text-xs px-2 py-0.5 rounded-full text-red-700 bg-red-50">Failed</span>}
         </div>
         <span className="text-xs" style={{ color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
       </button>
@@ -320,17 +431,26 @@ function ShopifySection({
             <>
               <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
                 <CheckCircle size={15} />
-                <span>Connected to <strong>{shop}</strong></span>
+                <span>Connected to <strong>{shop}</strong>. The agent polls for unfulfilled orders every cycle.</span>
               </div>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                The agent is polling this store every cycle for unfulfilled orders.
-              </p>
-              <button
-                onClick={onDisconnect}
-                className="flex items-center gap-1 self-start py-2 px-3 rounded-xl text-xs text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={12} /> Disconnect
-              </button>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={onTest}
+                  disabled={testState === 'testing'}
+                  className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold border transition-colors"
+                  style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                >
+                  {testState === 'testing' ? <Loader2 size={12} className="animate-spin" /> : <TestIconInline state={testState} />}
+                  {testState === 'testing' ? 'Checking…' : 'Ping server'}
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={onDisconnect}
+                  className="flex items-center gap-1 self-start py-2 px-3 rounded-xl text-xs text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={12} /> Disconnect
+                </button>
+              </div>
             </>
           ) : (
             <>

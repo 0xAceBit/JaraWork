@@ -58,7 +58,7 @@ async function serveStatic(pathname: string): Promise<Response | null> {
   // Always try to serve static files when dist/ exists (both prod and any env with a build)
   const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
   // Don't try to serve API paths as static files
-  if (rel.startsWith('agent/') || rel.startsWith('amazon/') || rel.startsWith('ebay/') || rel.startsWith('jumia/') || rel.startsWith('shopify/') || rel === 'health') return null
+  if (rel.startsWith('agent/') || rel.startsWith('amazon/') || rel.startsWith('ebay/') || rel.startsWith('jumia/') || rel.startsWith('shopify/') || rel === 'health' || rel === 'favicon.svg' || rel === 'logo.svg') return null
   const filePath = join(DIST_DIR, rel)
   const file = Bun.file(filePath)
   if (await file.exists()) {
@@ -234,10 +234,14 @@ function saveState() {
   }
 }
 
-// ─── Shopify token store (in-memory, keyed by shop domain) ───────────────────
-// Tokens survive until the server restarts. For production persistence,
-// move this to agent-state.json (same pattern as postedKeys).
-const shopifyTokens = new Map<string, string>()
+// ─── OAuth token stores (in-memory) ──────────────────────────────────────────
+const shopifyTokens = new Map<string, string>()   // shop → access_token
+
+interface EbayTokenSet { accessToken: string; refreshToken: string; expiresAt: number }
+let ebayTokenSet: EbayTokenSet | null = null
+
+interface AmazonTokenSet { refreshToken: string; sellerId: string }
+let amazonTokenSet: AmazonTokenSet | null = null
 
 // ─── Dedup: track external order IDs already posted on-chain ─────────────────
 
@@ -478,8 +482,8 @@ async function processMarketplaceOrders() {
 
   const serverCfg: Record<string, { apiKey: string; extra: Record<string, string> }> = {
     jaramarket: { apiKey: process.env.JARAMARKET_API_KEY ?? '', extra: { storeUrl: process.env.JARAMARKET_STORE_URL ?? '' } },
-    amazon:     { apiKey: process.env.AMAZON_ACCESS_KEY  ?? '', extra: { sellerId: process.env.AMAZON_SELLER_ID ?? '', marketplaceId: process.env.AMAZON_MARKETPLACE_ID ?? '' } },
-    ebay:       { apiKey: process.env.EBAY_CLIENT_ID     ?? '', extra: { clientSecret: process.env.EBAY_CLIENT_SECRET ?? '' } },
+    amazon:     { apiKey: amazonTokenSet?.refreshToken ?? '', extra: { sellerId: amazonTokenSet?.sellerId ?? '' } },
+    ebay:       { apiKey: ebayTokenSet?.accessToken    ?? '', extra: {} },
     jumia:      { apiKey: process.env.JUMIA_API_KEY      ?? '', extra: { country: process.env.JUMIA_COUNTRY ?? 'ng' } },
     // Shopify: handled separately below (multiple shops possible)
     shopify:    { apiKey: '', extra: {} },
@@ -871,10 +875,205 @@ Bun.serve({
       }
     }
 
-    // Marketplace relays (stubs — configure server-side API keys in .env)
-    if (path === '/amazon/orders') return json({ orders: [], note: 'Set AMAZON_ACCESS_KEY etc. in .env and implement SigV4 here.' })
-    if (path === '/ebay/orders')   return json({ orders: [], note: 'Set EBAY_CLIENT_ID etc. in .env and implement OAuth2 here.' })
-    if (path === '/ebay/ping')     return new Response(null, { status: process.env.EBAY_CLIENT_ID ? 200 : 503 })
+    // ── eBay OAuth ─────────────────────────────────────────────────────────────
+    // Step 1: Initiate OAuth
+    if (path === '/ebay/install' && req.method === 'GET') {
+      const clientId = process.env.EBAY_CLIENT_ID ?? ''
+      if (!clientId) return new Response('EBAY_CLIENT_ID not configured on server', { status: 503 })
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const redirectUri = encodeURIComponent(`${appUrl}/api/ebay/callback`)
+      const scopes = encodeURIComponent('https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly')
+      const state = Buffer.from(`ebay-${Date.now()}`).toString('base64')
+      const authUrl = `https://auth.ebay.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}`
+      return Response.redirect(authUrl, 302)
+    }
+
+    // Step 2: eBay OAuth callback
+    if (path === '/ebay/callback' && req.method === 'GET') {
+      const code       = url.searchParams.get('code') ?? ''
+      const clientId     = process.env.EBAY_CLIENT_ID ?? ''
+      const clientSecret = process.env.EBAY_CLIENT_SECRET ?? ''
+      if (!code || !clientId || !clientSecret) {
+        return new Response('Missing code or server config', { status: 400 })
+      }
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const redirectUri = `${appUrl}/api/ebay/callback`
+      try {
+        const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+        const tokenRes = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Basic ${creds}`,
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri,
+          }).toString(),
+        })
+        if (!tokenRes.ok) throw new Error(`eBay token exchange failed: ${tokenRes.status}`)
+        const tokenData = await tokenRes.json() as { access_token?: string; refresh_token?: string; expires_in?: number }
+        const accessToken = tokenData.access_token ?? ''
+        if (!accessToken) throw new Error('No access_token in eBay response')
+        ebayTokenSet = {
+          accessToken,
+          refreshToken: tokenData.refresh_token ?? '',
+          expiresAt: Date.now() + (tokenData.expires_in ?? 7200) * 1000,
+        }
+        logAction({ timestamp: Date.now(), type: 'info', message: 'eBay connected via OAuth' })
+        return Response.redirect(`${appUrl}/?ebay_connected=true`, 302)
+      } catch (e) {
+        logAction({ timestamp: Date.now(), type: 'error', message: `eBay OAuth error: ${(e as Error).message}` })
+        return new Response(`eBay auth failed: ${(e as Error).message}`, { status: 500 })
+      }
+    }
+
+    // eBay ping
+    if (path === '/ebay/ping' && req.method === 'GET') {
+      return new Response(null, { status: ebayTokenSet ? 200 : 503 })
+    }
+
+    // eBay orders — proxies Fulfillment API
+    if (path === '/ebay/orders' && req.method === 'GET') {
+      if (!ebayTokenSet) return json({ orders: [], note: 'eBay not connected. Complete OAuth first via /api/ebay/install.' })
+      // Refresh token if within 5 minutes of expiry
+      if (Date.now() > ebayTokenSet.expiresAt - 300_000 && ebayTokenSet.refreshToken) {
+        try {
+          const clientId     = process.env.EBAY_CLIENT_ID ?? ''
+          const clientSecret = process.env.EBAY_CLIENT_SECRET ?? ''
+          const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+          const refreshRes = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': `Basic ${creds}` },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: ebayTokenSet.refreshToken }).toString(),
+          })
+          if (refreshRes.ok) {
+            const rd = await refreshRes.json() as { access_token?: string; expires_in?: number }
+            if (rd.access_token) {
+              ebayTokenSet.accessToken = rd.access_token
+              ebayTokenSet.expiresAt   = Date.now() + (rd.expires_in ?? 7200) * 1000
+            }
+          }
+        } catch { /* use existing token if refresh fails */ }
+      }
+      try {
+        const res = await fetch(
+          'https://api.ebay.com/sell/fulfillment/v1/order?filter=orderfulfillmentstatus:%7BNOT_STARTED%7CIN_PROGRESS%7D&limit=50',
+          { headers: { Authorization: `Bearer ${ebayTokenSet.accessToken}`, 'Content-Type': 'application/json' } }
+        )
+        if (!res.ok) {
+          if (res.status === 401) ebayTokenSet = null
+          throw new Error(`eBay orders API returned ${res.status}`)
+        }
+        const data = await res.json() as { orders?: unknown[] }
+        return json({ orders: data.orders ?? [] })
+      } catch (e) {
+        return json({ error: (e as Error).message }, 500)
+      }
+    }
+
+    // ── Amazon SP-API OAuth ────────────────────────────────────────────────────
+    // Step 1: Initiate LWA (Login with Amazon) OAuth
+    if (path === '/amazon/install' && req.method === 'GET') {
+      const clientId = process.env.AMAZON_CLIENT_ID ?? process.env.AMAZON_LWA_CLIENT_ID ?? ''
+      if (!clientId) return new Response('AMAZON_CLIENT_ID not configured on server', { status: 503 })
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const redirectUri = encodeURIComponent(`${appUrl}/api/amazon/callback`)
+      const state = Buffer.from(`amazon-${Date.now()}`).toString('base64')
+      // SP-API application_id must also be set for the /apps/authorize endpoint
+      const appId = process.env.AMAZON_APP_ID ?? ''
+      if (!appId) return new Response('AMAZON_APP_ID not configured on server', { status: 503 })
+      // Sellers authorize via Seller Central
+      const authUrl = `https://sellercentral.amazon.com/apps/authorize/consent?application_id=${appId}&state=${state}&redirect_uri=${redirectUri}`
+      return Response.redirect(authUrl, 302)
+    }
+
+    // Step 2: Amazon SP-API OAuth callback — exchange for LWA access token
+    if (path === '/amazon/callback' && req.method === 'GET') {
+      const spApiOauthCode = url.searchParams.get('spapi_oauth_code') ?? ''
+      const sellingPartnerId = url.searchParams.get('selling_partner_id') ?? ''
+      const clientId     = process.env.AMAZON_CLIENT_ID ?? process.env.AMAZON_LWA_CLIENT_ID ?? ''
+      const clientSecret = process.env.AMAZON_CLIENT_SECRET ?? process.env.AMAZON_LWA_CLIENT_SECRET ?? ''
+      if (!spApiOauthCode || !clientId || !clientSecret) {
+        return new Response('Missing spapi_oauth_code or server config', { status: 400 })
+      }
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      try {
+        const tokenRes = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: spApiOauthCode,
+            client_id: clientId,
+            client_secret: clientSecret,
+          }).toString(),
+        })
+        if (!tokenRes.ok) throw new Error(`Amazon token exchange failed: ${tokenRes.status}`)
+        const tokenData = await tokenRes.json() as { access_token?: string; refresh_token?: string }
+        const refreshToken = tokenData.refresh_token ?? ''
+        if (!refreshToken) throw new Error('No refresh_token in Amazon response')
+        amazonTokenSet = { refreshToken, sellerId: sellingPartnerId }
+        logAction({ timestamp: Date.now(), type: 'info', message: `Amazon SP-API connected (seller: ${sellingPartnerId})` })
+        return Response.redirect(`${appUrl}/?amazon_connected=true`, 302)
+      } catch (e) {
+        logAction({ timestamp: Date.now(), type: 'error', message: `Amazon OAuth error: ${(e as Error).message}` })
+        return new Response(`Amazon auth failed: ${(e as Error).message}`, { status: 500 })
+      }
+    }
+
+    // Amazon ping
+    if (path === '/amazon/ping' && req.method === 'GET') {
+      return new Response(null, { status: amazonTokenSet ? 200 : 503 })
+    }
+
+    // Amazon orders — exchanges refresh_token for access_token, then proxies SP-API
+    if (path === '/amazon/orders' && req.method === 'GET') {
+      if (!amazonTokenSet) return json({ orders: [], note: 'Amazon not connected. Complete OAuth first via /api/amazon/install.' })
+      const marketplaceId = process.env.AMAZON_MARKETPLACE_ID ?? 'ATVPDKIKX0DER'
+      try {
+        // Always get a fresh LWA access token via refresh_token
+        const clientId     = process.env.AMAZON_CLIENT_ID ?? process.env.AMAZON_LWA_CLIENT_ID ?? ''
+        const clientSecret = process.env.AMAZON_CLIENT_SECRET ?? process.env.AMAZON_LWA_CLIENT_SECRET ?? ''
+        const lwaRes = await fetch('https://api.amazon.com/auth/o2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: amazonTokenSet.refreshToken,
+            client_id: clientId,
+            client_secret: clientSecret,
+          }).toString(),
+        })
+        if (!lwaRes.ok) throw new Error(`LWA token refresh failed: ${lwaRes.status}`)
+        const lwaData = await lwaRes.json() as { access_token?: string }
+        const accessToken = lwaData.access_token ?? ''
+        if (!accessToken) throw new Error('No access_token from LWA refresh')
+
+        const createdAfter = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        const params = new URLSearchParams({
+          MarketplaceIds: marketplaceId,
+          CreatedAfter: createdAfter,
+          OrderStatuses: 'Unshipped,PartiallyShipped',
+          ...(amazonTokenSet.sellerId ? { SellerId: amazonTokenSet.sellerId } : {}),
+        })
+        const res = await fetch(
+          `https://sellingpartnerapi-na.amazon.com/orders/v0/orders?${params}`,
+          { headers: { 'x-amz-access-token': accessToken, 'Content-Type': 'application/json' } }
+        )
+        if (!res.ok) {
+          if (res.status === 401) amazonTokenSet = null
+          throw new Error(`Amazon orders API returned ${res.status}`)
+        }
+        const data = await res.json() as { payload?: { Orders?: unknown[] } }
+        return json({ orders: data.payload?.Orders ?? [] })
+      } catch (e) {
+        return json({ error: (e as Error).message }, 500)
+      }
+    }
+
+    // Jumia relay (user pastes their own key — correct for Jumia's closed API)
     if (path === '/jumia/orders')  return json({ orders: [], note: 'Set JUMIA_API_KEY etc. in .env.' })
     if (path === '/jumia/ping')    return new Response(null, { status: process.env.JUMIA_API_KEY ? 200 : 503 })
 

@@ -19,8 +19,8 @@ export interface MarketplaceAdapter {
 
 export interface MarketplaceKeys {
   jaramarket?: { apiKey: string; storeUrl: string }
-  amazon?: { accessKey: string; secretKey: string; sellerId: string; marketplaceId: string }
-  ebay?: { clientId: string; clientSecret: string }
+  amazon?: { connected: boolean }        // OAuth — token held server-side
+  ebay?: { connected: boolean }          // OAuth — token held server-side
   jumia?: { apiKey: string; country: string }
   shopify?: { shop: string; connected: boolean }
 }
