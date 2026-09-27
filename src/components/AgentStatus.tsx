@@ -400,12 +400,12 @@ export default function AgentStatus() {
           <div className="rounded-2xl p-4 flex flex-col gap-1" style={{ background: 'var(--surface-strong)', border: '1px solid var(--border)' }}>
             <p className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--muted)' }}>Agent Wallet</p>
             <a
-              href={buildAddressExplorerUrl(CHAIN_ID, status.agentWalletId!)}
+              href={buildAddressExplorerUrl(CHAIN_ID, AGENT_WALLET_ADDRESS || '0xa7d90f5f3654a9d7da551fd24a4fba593a24fde6')}
               target="_blank" rel="noopener"
               className="mono text-xs underline truncate"
               style={{ color: 'var(--accent-hover)' }}
             >
-              {status.agentWalletId!.slice(0, 12)}…
+              {(AGENT_WALLET_ADDRESS || '0xa7d90f5f3654a9d7da551fd24a4fba593a24fde6').slice(0, 6)}…{(AGENT_WALLET_ADDRESS || '0xa7d90f5f3654a9d7da551fd24a4fba593a24fde6').slice(-4)}
             </a>
           </div>
           <div className="rounded-2xl p-4 flex flex-col gap-1" style={{ background: 'var(--surface-strong)', border: '1px solid var(--border)' }}>

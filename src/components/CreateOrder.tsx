@@ -282,6 +282,24 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
               style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--ink)' }}
             />
           </div>
+          {/* Balance hint */}
+          {balance != null && (
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs" style={{ color: 'var(--subtle)' }}>
+                Your balance
+              </span>
+              <button
+                type="button"
+                onClick={() => setAmount(formatUsdc(balance))}
+                className="flex items-center gap-1 text-xs font-semibold transition-opacity hover:opacity-70"
+                style={{ color: (parsedAmount !== null && (balance) < parsedAmount) ? 'var(--danger)' : 'var(--accent)' }}
+              >
+                <TokenUSDC variant="branded" size={12} />
+                {formatUsdc(balance)} USDC
+                {parsedAmount !== null && (balance) < parsedAmount && ' — insufficient'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Step explanation */}

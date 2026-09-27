@@ -93,11 +93,14 @@ function validateIpfs(value: string): ValidationResult {
   return { valid: true, hint: 'Valid IPFS content identifier' }
 }
 
+const TEXT_MAX = 450   // leaves headroom for the JSON wrapper + note field
+
 function validateText(value: string): ValidationResult {
   const v = value.trim()
   if (!v) return { valid: false, hint: 'Enter a delivery description' }
   if (v.length < 10) return { valid: false, hint: `Too brief — add more detail (${v.length}/10 chars minimum)` }
-  return { valid: true, hint: `${v.length} characters` }
+  if (v.length > TEXT_MAX) return { valid: false, hint: `Too long — ${v.length}/${TEXT_MAX} chars (trim to fit on-chain)` }
+  return { valid: true, hint: `${v.length}/${TEXT_MAX} characters` }
 }
 
 // ─── Type config ──────────────────────────────────────────────────────────────
@@ -272,20 +275,31 @@ export default function DeliveryModal({ orderTitle, onSubmit, onClose, isPending
               {typeConfig.label}
             </label>
             {typeConfig.inputType === 'textarea' ? (
-              <textarea
-                id={uid}
-                rows={3}
-                placeholder={typeConfig.placeholder}
-                value={value}
-                onChange={e => setValue(e.target.value)}
-                disabled={busy}
-                className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none transition-all"
-                style={{
-                  background: 'var(--surface-muted)',
-                  border: `1.5px solid ${value && validation.valid ? 'var(--success)' : value ? '#ef4444' : 'var(--border)'}`,
-                  color: 'var(--ink)',
-                }}
-              />
+              <>
+                <textarea
+                  id={uid}
+                  rows={3}
+                  maxLength={TEXT_MAX + 50}
+                  placeholder={typeConfig.placeholder}
+                  value={value}
+                  onChange={e => setValue(e.target.value)}
+                  disabled={busy}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none transition-all"
+                  style={{
+                    background: 'var(--surface-muted)',
+                    border: `1.5px solid ${value && validation.valid ? 'var(--success)' : value ? '#ef4444' : 'var(--border)'}`,
+                    color: 'var(--ink)',
+                  }}
+                />
+                <div className="flex justify-end">
+                  <span
+                    className="text-xs tabular"
+                    style={{ color: value.length > TEXT_MAX ? '#ef4444' : 'var(--subtle)' }}
+                  >
+                    {value.length}/{TEXT_MAX}
+                  </span>
+                </div>
+              </>
             ) : (
               <input
                 id={uid}

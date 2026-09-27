@@ -248,10 +248,39 @@ export default function App() {
         <section style={{ display: tab === 'board' ? 'block' : 'none' }}>
           {!isConnected
             ? <HeroSection onPost={() => setTab('create')} onBrowse={() => {}} />
-            : <PageHeader
-                label="Open Orders"
-                sub="Claim an order to earn USDC. Payment releases from escrow once delivery is confirmed."
-              />
+            : (
+              <motion.div
+                className="rounded-2xl px-4 py-3 mb-5 flex items-center justify-between gap-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22 }}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(232,112,10,0.12) 0%, rgba(245,168,92,0.08) 100%)',
+                  border: '1px solid rgba(232,112,10,0.18)',
+                }}
+              >
+                <div>
+                  <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+                    Open Orders
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                    Claim an order to earn USDC — payment auto-releases on delivery.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTab('create')}
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
+                  style={{
+                    background: 'linear-gradient(145deg, #e8700a, #c75f00)',
+                    color: '#fff',
+                    boxShadow: '0 3px 12px rgba(232,112,10,0.28)',
+                  }}
+                >
+                  <Plus size={13} />
+                  Post
+                </button>
+              </motion.div>
+            )
           }
           <OrderBoard externalRefreshSeed={boardRefreshSeed} />
         </section>
