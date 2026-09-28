@@ -4,11 +4,11 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain } from 'wagmi'
 import { useState, useEffect } from 'react'
 import { erc20Abi, parseUnits } from 'viem'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { JARA_WORK_ESCROW, type Order } from '../contracts/jaraWorkEscrow'
 import { getUsdc } from '../onchain-facts'
 
-const CHAIN_ID = arcTestnet.id
+const CHAIN_ID = arc.id
 const usdcFact = getUsdc(CHAIN_ID)
 export const USDC_ADDRESS = usdcFact?.address as `0x${string}`
 
@@ -391,8 +391,8 @@ export function useWorkerReputation(worker: `0x${string}` | undefined): {
     async function compute() {
       try {
         const { createPublicClient, http } = await import('viem')
-        const { arcTestnet: arcChain } = await import('viem/chains')
-        const client = createPublicClient({ chain: arcChain, transport: http() })
+        const { arc: arcChain } = await import('viem/chains')
+        const client = createPublicClient({ chain: arcChain, transport: http('https://rpc.mainnet.arc.io') })
 
         const results = await Promise.allSettled(
           orderKeys.map(key =>
