@@ -26,7 +26,7 @@ import {
 import { parseOrderStruct } from '../hooks/useEscrow'
 import { JARA_WORK_ESCROW } from '../contracts/jaraWorkEscrow'
 
-const EXPLORER = 'https://explorer.testnet.arc.io'
+const EXPLORER = 'https://explorer.arc.io'
 
 function shortAddr(a: string) {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
@@ -458,7 +458,7 @@ export default function AdminPanel() {
         <div className="flex items-center gap-2">
           <TokenUSDC size={16} />
           <div>
-            <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Escrow Contract · Arc Testnet</p>
+            <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Escrow Contract · Arc Mainnet</p>
             <p className="text-xs mono mt-0.5" style={{ color: 'var(--subtle)' }}>{JARA_WORK_ESCROW.address}</p>
           </div>
         </div>

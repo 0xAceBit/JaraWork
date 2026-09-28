@@ -132,7 +132,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
         <div className="w-full rounded-2xl p-4 flex flex-col gap-3 text-center" style={{ background: '#fef3c7', border: '1px solid #f59e0b' }}>
           <p className="font-semibold text-sm" style={{ color: '#92400e' }}>Wrong network</p>
           <p className="text-xs" style={{ color: '#b45309' }}>
-            JaraWork runs on Arc Testnet. Your wallet is on a different network.
+            JaraWork runs on Arc Mainnet. Your wallet is on a different network.
           </p>
           <button
             onClick={() => switchChain({ chainId: CHAIN_ID })}
@@ -334,7 +334,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
       <p className="text-xs text-center" style={{ color: 'var(--subtle)' }}>
         USDC is held in escrow at{' '}
         <a
-          href={`https://explorer.testnet.arc.io/address/${JARA_WORK_ESCROW.address}`}
+          href={`https://explorer.arc.io/address/${JARA_WORK_ESCROW.address}`}
           target="_blank" rel="noopener"
           className="mono underline"
         >

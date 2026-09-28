@@ -91,7 +91,7 @@ function HeroSection({ onPost, onBrowse }: { onPost: () => void; onBrowse: () =>
             style={{ background: 'rgba(0,0,0,0.18)', color: 'rgba(255,255,255,0.90)' }}
           >
             <NetworkArc size={13} />
-            Arc Testnet
+            Arc Mainnet
           </div>
           <div
             className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
@@ -356,10 +356,10 @@ export default function App() {
                 style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}
               >
                 <p className="text-xs font-bold uppercase" style={{ color: 'var(--subtle)', letterSpacing: '0.08em' }}>
-                  Escrow Contract · Arc Testnet
+                  Escrow Contract · Arc Mainnet
                 </p>
                 <a
-                  href={`https://explorer.testnet.arc.io/address/${JARA_WORK_ESCROW.address}`}
+                  href={`https://explorer.arc.io/address/${JARA_WORK_ESCROW.address}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mono text-xs underline break-all"
