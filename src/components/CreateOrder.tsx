@@ -48,7 +48,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
 
   // Hooks
   const { data: balance } = useUsdcBalance(address)
-  const { data: allowance, refetch: refetchAllowance } = useUsdcAllowance(address)
+  const { data: allowance } = useUsdcAllowance(address)
   const { approve, isPending: approving, isConfirming: approveConfirming, isSuccess: approveSuccess, error: approveError, hash: approveHash } = useApproveUsdc()
   const { create, isPending: creating, isConfirming: createConfirming, isSuccess: createSuccess, error: createError, hash: createHash } = useCreateOrder()
 
@@ -62,12 +62,12 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
           <a href={buildTxExplorerUrl(CHAIN_ID, approveHash)} target="_blank" rel="noopener" className="underline">View on explorer</a>
         ) : undefined,
       })
-      // Refetch allowance then proceed — small delay lets the node index the approval
-      setTimeout(() => {
-        void refetchAllowance().then(() => setStep('create'))
-      }, 1500)
+      // Proceed immediately — approval was MaxUint256 so allowance is guaranteed sufficient.
+      // Do NOT await refetchAllowance: the RPC node may lag and return stale data,
+      // which would leave the UI stuck on "Confirming approval…" indefinitely.
+      setStep('create')
     }
-  }, [approveSuccess, approveHash, refetchAllowance])
+  }, [approveSuccess, approveHash])
 
   useEffect(() => {
     if (approveError) toast.error('Approval failed', { description: (approveError as Error).message })
