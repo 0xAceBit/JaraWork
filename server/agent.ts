@@ -24,12 +24,12 @@ import { join, extname } from 'node:path'
 // On Render, PORT is set by the platform. Agent API is always on 3001 internally.
 // The main HTTP server (frontend + API) listens on PORT; agent-only internals stay on 3001.
 
-const API_KEY        = process.env.CIRCLE_DEVELOPER_CONTROLLED_API_KEY ?? ''
-const ENTITY_SECRET  = process.env.CIRCLE_ENTITY_SECRET ?? ''
-const AGENT_WALLET_ID   = process.env.VITE_AGENT_WALLET_ID ?? ''
-const CONTRACT_ADDRESS  = process.env.VITE_ESCROW_CONTRACT_ADDRESS ?? ''
+const API_KEY        = process.env.CIRCLE_MAINNET_API_KEY ?? process.env.CIRCLE_DEVELOPER_CONTROLLED_API_KEY ?? ''
+const ENTITY_SECRET  = process.env.CIRCLE_MAINNET_ENTITY_SECRET ?? process.env.CIRCLE_ENTITY_SECRET ?? ''
+const AGENT_WALLET_ID   = process.env.VITE_MAINNET_AGENT_WALLET_ID ?? process.env.VITE_AGENT_WALLET_ID ?? ''
+const CONTRACT_ADDRESS  = process.env.VITE_MAINNET_ESCROW_CONTRACT_ADDRESS ?? process.env.VITE_ESCROW_CONTRACT_ADDRESS ?? ''
 const USDC_ADDRESS      = process.env.VITE_USDC_ADDRESS ?? ''
-const BLOCKCHAIN = 'ARC-TESTNET'
+const BLOCKCHAIN = process.env.AGENT_BLOCKCHAIN ?? 'ARC'
 
 const AUTO_RELEASE_DELAY_S = parseInt(process.env.AUTO_RELEASE_DELAY_SECONDS ?? '86400', 10)
 const AUTO_REFUND_DELAY_S  = parseInt(process.env.AUTO_REFUND_DELAY_SECONDS  ?? '604800', 10)

@@ -30,7 +30,8 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 | Contract | Address | Chain | Notes |
 |---|---|---|---|
-| JaraWorkEscrow v3 | `0x9e820abe45420bf544331c39dc0b5fed738abbc2` | Arc Testnet | owner=0x362f5b..., platform=agent wallet; txHash: 0x0637c8d101297be6556da81ddc415d6e6bfb4d26644fad80fd36d776753a303e |
+| JaraWorkEscrow v1 (mainnet) | `0x52A34aD73fAe6Bd151F25F1BCDf13AA7781422d5` | Arc Mainnet (5042) | owner=0xB43218f526c3d0bB9ed205000525E5e4282BF560, platform=0xb7fed760971e29badfe296e255703eb358195346 (mainnet agent wallet); txHash: 0xbdc0ec9136c875ca6a79f361193d00e7a2f906c81c068b46a95a40b36a34df2d; setPlatform tx: 0xfd089bbbcc95bb3aa6e72be0d2b6291d1c6ac7ee7abdbf710648af0787813817 |
+| JaraWorkEscrow v5 (testnet) | `0x9e820abe45420bf544331c39dc0b5fed738abbc2` | Arc Testnet (5042002) | owner=0x362f5b..., platform=agent wallet; active testnet contract |
 | JaraWorkEscrow v2 | `0xd454036b54c5be123e2e3331fd9363df14400af5` | Arc Testnet | Platform agent role; feeBps=250 (deprecated) |
 | JaraWorkEscrow v1 | `0x74eb073bee50937a762cdd3836ca1b3b12919c5d` | Arc Testnet | Original, no platform role |
 
