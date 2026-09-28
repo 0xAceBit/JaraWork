@@ -227,9 +227,8 @@ export default function App() {
             <img
               src="/logo.svg"
               alt="JaraWork logo"
-              className="w-9 h-9 rounded-2xl shrink-0 object-contain"
-              style={{ background: '#1a0f00', boxShadow: '0 3px 12px rgba(232,112,10,0.45)', padding: '3px' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              className="w-9 h-9 shrink-0"
+              style={{ filter: 'drop-shadow(0 2px 6px rgba(232,112,10,0.5))' }}
             />
             <div className="leading-tight text-left">
               <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.025em' }}>
