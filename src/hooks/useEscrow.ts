@@ -108,7 +108,7 @@ export function useUsdcBalance(address: `0x${string}` | undefined) {
 
 export function useApproveUsdc() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
 
   const approve = (amount: bigint) => {
     writeContract({
@@ -124,7 +124,7 @@ export function useApproveUsdc() {
 
 export function useCreateOrder() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -152,7 +152,7 @@ export function useCreateOrder() {
 
 export function useClaimOrder() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -169,7 +169,7 @@ export function useClaimOrder() {
 
 export function useSubmitDelivery() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -186,7 +186,7 @@ export function useSubmitDelivery() {
 
 export function useConfirmDelivery() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -203,7 +203,7 @@ export function useConfirmDelivery() {
 
 export function useRefundOrder() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -220,7 +220,7 @@ export function useRefundOrder() {
 
 export function useSetPlatform() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -245,7 +245,7 @@ export function useDisputedOrderKeys() {
 
 export function useResolveDispute() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -295,7 +295,7 @@ export function useFeeRecipient() {
 
 export function useSetFeeBps() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -309,7 +309,7 @@ export function useSetFeeBps() {
 
 export function useSetFeeRecipient() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
@@ -323,7 +323,7 @@ export function useSetFeeRecipient() {
 
 export function useDisputeOrder() {
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: CHAIN_ID })
   const { chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
