@@ -181,10 +181,27 @@ export default function App() {
   const ARC_MAINNET_ID = 5042
 
   // Auto-prompt switch to Arc Mainnet when wallet connects on wrong chain
+  // Uses wallet_addEthereumChain so MetaMask can add Arc if not already configured
   useEffect(() => {
-    if (isConnected && chainId && chainId !== ARC_MAINNET_ID) {
+    if (!isConnected || !chainId || chainId === ARC_MAINNET_ID) return
+    const addAndSwitch = async () => {
+      try {
+        await (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum?.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x13B2',
+            chainName: 'Arc Mainnet',
+            nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+            rpcUrls: ['https://rpc.mainnet.arc.io'],
+            blockExplorerUrls: ['https://explorer.arc.io'],
+          }],
+        })
+      } catch {
+        // wallet_addEthereumChain may fail if chain already exists — fall through to switchChain
+      }
       switchChain?.({ chainId: ARC_MAINNET_ID })
     }
+    addAndSwitch()
   }, [isConnected, chainId, switchChain, ARC_MAINNET_ID])
 
   const { data: ownerRaw } = useContractOwner()

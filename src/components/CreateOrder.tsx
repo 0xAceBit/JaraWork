@@ -8,12 +8,12 @@ import { parseUnits } from 'viem'
 import { useApproveUsdc, useCreateOrder, useUsdcAllowance, useUsdcBalance } from '../hooks/useEscrow'
 import { JARA_WORK_ESCROW, MARKETPLACE_LABELS } from '../contracts/jaraWorkEscrow'
 import { buildTxExplorerUrl } from '../onchain-facts'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import type { MarketplaceOrder } from '../lib/marketplaces/types'
 import { useMarketplaceOrders } from '../hooks/useMarketplaceOrders'
 
 const MARKETPLACES = ['manual', 'jaramarket', 'amazon', 'ebay', 'jumia'] as const
-const CHAIN_ID = arcTestnet.id
+const CHAIN_ID = arc.id
 const USDC_DECIMALS = 6
 
 function formatUsdc(raw: bigint) {
@@ -139,7 +139,7 @@ export default function CreateOrder({ prefill, onCreated }: Props) {
             className="self-center py-2 px-6 rounded-xl text-sm font-semibold"
             style={{ background: '#f59e0b', color: '#fff' }}
           >
-            Switch to Arc Testnet
+            Switch to Arc Mainnet
           </button>
         </div>
       </div>
