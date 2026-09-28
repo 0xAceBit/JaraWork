@@ -224,12 +224,34 @@ export default function App() {
             className="flex items-center gap-2.5 focus:outline-none"
           >
             {/* Logo mark */}
-            <img
-              src="/logo.svg"
-              alt="JaraWork logo"
-              className="w-9 h-9 shrink-0"
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(232,112,10,0.5))' }}
-            />
+            <svg width="36" height="36" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0" style={{filter:'drop-shadow(0 2px 6px rgba(232,112,10,0.5))'}}>
+              <defs>
+                <linearGradient id="jGrad" x1="60" y1="10" x2="140" y2="170" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#FFB347"/>
+                  <stop offset="40%" stopColor="#FF8C00"/>
+                  <stop offset="100%" stopColor="#E65C00"/>
+                </linearGradient>
+                <linearGradient id="checkGrad" x1="90" y1="120" x2="155" y2="175" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#FFD700"/>
+                  <stop offset="100%" stopColor="#FFA500"/>
+                </linearGradient>
+                <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000040"/>
+                </filter>
+              </defs>
+              <g filter="url(#shadow)">
+                <path d="M108 12 L148 12 L148 52 L138 52 L138 22 L118 22 L118 12 Z" fill="#FFD080"/>
+                <path d="M138 12 L148 22 L138 22 Z" fill="#FFB347"/>
+                <path d="M108 12 L138 12 L138 22 L148 22 L148 115 Q148 155 115 165 Q82 175 68 148 L68 135 Q78 158 100 155 Q128 150 128 120 L128 22 L108 22 Z" fill="url(#jGrad)"/>
+                <rect x="86" y="40" width="42" height="6" rx="3" fill="white" opacity="0.9"/>
+                <rect x="86" y="54" width="42" height="6" rx="3" fill="white" opacity="0.9"/>
+                <rect x="86" y="68" width="30" height="6" rx="3" fill="white" opacity="0.9"/>
+              </g>
+              <g filter="url(#shadow)">
+                <path d="M88 138 L104 158 L148 118" stroke="#1a0a00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.18"/>
+                <path d="M88 138 L104 158 L148 118" stroke="url(#checkGrad)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </g>
+            </svg>
             <div className="leading-tight text-left">
               <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.025em' }}>
                 JaraWork
