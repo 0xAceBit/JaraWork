@@ -74,7 +74,7 @@ async function serveStatic(pathname: string): Promise<Response | null> {
 }
 
 // Low-balance alert config
-const LOW_BALANCE_THRESHOLD = parseFloat(process.env.LOW_BALANCE_THRESHOLD_USDC ?? '5.00')
+const LOW_BALANCE_THRESHOLD = parseFloat(process.env.LOW_BALANCE_THRESHOLD_USDC ?? '0.10')
 const ALERT_WEBHOOK_URL     = process.env.ALERT_WEBHOOK_URL ?? ''
 
 // New-order notification config
