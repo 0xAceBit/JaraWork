@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ConnectKitButton } from 'connectkit'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutGrid, Plus, Briefcase, Settings, Bot, ArrowRight, ShieldCheck, Zap, Clock, ShieldAlert } from 'lucide-react'
 import { NetworkArc } from '@web3icons/react'
@@ -176,6 +176,17 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('board')
   const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
   const { isConnected, address } = useAccount()
+  const chainId = useChainId()
+  const { switchChain } = useSwitchChain()
+  const ARC_MAINNET_ID = 5042
+
+  // Auto-prompt switch to Arc Mainnet when wallet connects on wrong chain
+  useEffect(() => {
+    if (isConnected && chainId && chainId !== ARC_MAINNET_ID) {
+      switchChain?.({ chainId: ARC_MAINNET_ID })
+    }
+  }, [isConnected, chainId, switchChain, ARC_MAINNET_ID])
+
   const { data: ownerRaw } = useContractOwner()
   const owner = (ownerRaw as string | undefined) ?? ''
   const isOwner = !!address && !!owner && address.toLowerCase() === (owner).toLowerCase()
@@ -268,42 +279,43 @@ export default function App() {
 
         {/* Order Board — always mounted, hidden when off-tab so state never resets */}
         <section style={{ display: tab === 'board' ? 'block' : 'none' }}>
-          {!isConnected
-            ? <HeroSection onPost={() => setTab('create')} onBrowse={() => {}} />
-            : (
-              <motion.div
-                className="rounded-2xl px-4 py-3 mb-5 flex items-center justify-between gap-3"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22 }}
+          {/* Hero always visible on board tab */}
+          <HeroSection onPost={() => setTab('create')} onBrowse={() => {}} />
+
+          {/* Compact action bar — only when connected */}
+          {isConnected && (
+            <motion.div
+              className="rounded-2xl px-4 py-3 mb-5 flex items-center justify-between gap-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+              style={{
+                background: 'linear-gradient(135deg, rgba(232,112,10,0.12) 0%, rgba(245,168,92,0.08) 100%)',
+                border: '1px solid rgba(232,112,10,0.18)',
+              }}
+            >
+              <div>
+                <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+                  Open Orders
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                  Claim an order to earn USDC — payment auto-releases on delivery.
+                </p>
+              </div>
+              <button
+                onClick={() => setTab('create')}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(232,112,10,0.12) 0%, rgba(245,168,92,0.08) 100%)',
-                  border: '1px solid rgba(232,112,10,0.18)',
+                  background: 'linear-gradient(145deg, #e8700a, #c75f00)',
+                  color: '#fff',
+                  boxShadow: '0 3px 12px rgba(232,112,10,0.28)',
                 }}
               >
-                <div>
-                  <p className="display font-bold text-sm" style={{ color: 'var(--ink)', letterSpacing: '-0.02em' }}>
-                    Open Orders
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    Claim an order to earn USDC — payment auto-releases on delivery.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setTab('create')}
-                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
-                  style={{
-                    background: 'linear-gradient(145deg, #e8700a, #c75f00)',
-                    color: '#fff',
-                    boxShadow: '0 3px 12px rgba(232,112,10,0.28)',
-                  }}
-                >
-                  <Plus size={13} />
-                  Post
-                </button>
-              </motion.div>
-            )
-          }
+                <Plus size={13} />
+                Post
+              </button>
+            </motion.div>
+          )}
           <OrderBoard externalRefreshSeed={boardRefreshSeed} />
         </section>
 
