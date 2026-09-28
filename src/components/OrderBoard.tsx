@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,7 +15,7 @@ import DeliveryModal from './DeliveryModal'
 import { buildTxExplorerUrl } from '../onchain-facts'
 import { MARKETPLACE_LABELS } from '../contracts/jaraWorkEscrow'
 import type { Order } from '../contracts/jaraWorkEscrow'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 
 // ─── Filter state ────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ function SingleOrder({
 
   useEffect(() => {
     if (claimSuccess) {
-      toast.success('Order claimed!', { description: claimHash ? <a href={buildTxExplorerUrl(arcTestnet.id, claimHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
+      toast.success('Order claimed!', { description: claimHash ? <a href={buildTxExplorerUrl(arc.id, claimHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
       void refetch()
       onClaimSuccess()
     }
@@ -80,7 +80,7 @@ function SingleOrder({
 
   useEffect(() => {
     if (submitSuccess) {
-      toast.success('Delivery submitted!', { description: submitHash ? <a href={buildTxExplorerUrl(arcTestnet.id, submitHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
+      toast.success('Delivery submitted!', { description: submitHash ? <a href={buildTxExplorerUrl(arc.id, submitHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
       void refetch()
       setShowDeliveryModal(false)
       onDeliverySuccess()
@@ -89,7 +89,7 @@ function SingleOrder({
 
   useEffect(() => {
     if (confirmSuccess) {
-      toast.success('Payment released to worker!', { description: confirmHash ? <a href={buildTxExplorerUrl(arcTestnet.id, confirmHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
+      toast.success('Payment released to worker!', { description: confirmHash ? <a href={buildTxExplorerUrl(arc.id, confirmHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
       void refetch()
       onConfirmSuccess()
     }
@@ -97,7 +97,7 @@ function SingleOrder({
 
   useEffect(() => {
     if (refundSuccess) {
-      toast.success('Refund sent!', { description: refundHash ? <a href={buildTxExplorerUrl(arcTestnet.id, refundHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
+      toast.success('Refund sent!', { description: refundHash ? <a href={buildTxExplorerUrl(arc.id, refundHash)} target="_blank" rel="noopener" className="underline">View on explorer</a> : undefined })
       void refetch()
       onRefundSuccess()
     }
@@ -419,12 +419,12 @@ export default function OrderBoard({ statusFilter: _statusFilter, buyerFilter: _
   const [loadingMore, setLoadingMore] = useState(false)
   const [cardRevision, setCardRevision] = useState(0)
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
-  const prevSeedRef = useState(externalRefreshSeed ?? 0)
+  const prevSeedRef = useRef(externalRefreshSeed ?? 0)
 
   // Trigger refresh when parent increments the seed (e.g. after posting a new order)
   useEffect(() => {
-    if (externalRefreshSeed !== undefined && externalRefreshSeed !== prevSeedRef[0]) {
-      prevSeedRef[1](externalRefreshSeed)
+    if (externalRefreshSeed !== undefined && externalRefreshSeed !== prevSeedRef.current) {
+      prevSeedRef.current = externalRefreshSeed
       void refresh()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
