@@ -115,7 +115,7 @@ function HeroSection({ onPost, onBrowse }: { onPost: () => void; onBrowse: () =>
             Payment guaranteed.
           </h1>
           <p className="text-white/65 text-sm mt-3 leading-relaxed max-w-[280px] text-pretty">
-            Orders from Jaramarket, Amazon, eBay and Jumia — fulfilled by workers worldwide, paid in USDC.
+            Orders from Jaramarket, Amazon, eBay, Shopify and Jumia — fulfilled by workers worldwide, paid in USDC.
           </p>
         </div>
 
