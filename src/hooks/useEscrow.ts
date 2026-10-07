@@ -38,7 +38,7 @@ export function useOpenOrdersPaginated(offset: number) {
     functionName: 'getOpenOrdersPaginated',
     args: [BigInt(offset), BigInt(PAGE_SIZE)],
     chainId: CHAIN_ID,
-    query: { refetchInterval: 15_000 },
+    query: { refetchInterval: 15_000, retry: 2, retryDelay: 2_000 },
   })
 }
 

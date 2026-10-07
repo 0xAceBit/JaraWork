@@ -174,7 +174,7 @@ function useAccumulatedOpenOrders() {
   const [refreshSeed, setRefreshSeed] = useState(0)
 
   const offset = (pages - 1) * ORDERS_PAGE_SIZE
-  const { data, isLoading, refetch } = useOpenOrdersPaginated(offset)
+  const { data, isLoading, isError, refetch } = useOpenOrdersPaginated(offset)
 
   useEffect(() => {
     if (!data) return
@@ -200,7 +200,7 @@ function useAccumulatedOpenOrders() {
   const refresh  = useCallback(() => setRefreshSeed(s => s + 1), [])
   const hasMore  = total !== null && allKeys.length < total
 
-  return { allKeys, total, isLoading, hasMore, loadMore, refresh }
+  return { allKeys, total, isLoading, isError, hasMore, loadMore, refresh }
 }
 
 // ─── FilterBar ────────────────────────────────────────────────────────────────
@@ -414,7 +414,7 @@ interface Props {
 
 export default function OrderBoard({ statusFilter: _statusFilter, buyerFilter: _buyerFilter, workerFilter: _workerFilter, externalRefreshSeed }: Props) {
   const { address } = useAccount()
-  const { allKeys, total, isLoading, hasMore, loadMore, refresh } = useAccumulatedOpenOrders()
+  const { allKeys, total, isLoading, isError, hasMore, loadMore, refresh } = useAccumulatedOpenOrders()
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cardRevision, setCardRevision] = useState(0)
@@ -561,6 +561,14 @@ export default function OrderBoard({ statusFilter: _statusFilter, buyerFilter: _
       />
 
       {/* Loading skeleton */}
+      {isError && allKeys.length === 0 && (
+        <div className="text-center py-12 text-sm" style={{ color: 'var(--muted)' }}>
+          <p className="mb-3">Could not load orders. Check your connection and try again.</p>
+          <button onClick={() => void refresh()} className="px-4 py-2 rounded-xl text-sm font-semibold border" style={{ borderColor: 'var(--border)', color: 'var(--amber-primary)' }}>
+            Retry
+          </button>
+        </div>
+      )}
       {isLoading && allKeys.length === 0 && (
         <div className="flex flex-col gap-3">
           {[0, 1, 2].map(i => (
