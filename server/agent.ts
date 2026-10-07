@@ -880,11 +880,10 @@ Bun.serve({
     if (path === '/ebay/install' && req.method === 'GET') {
       const clientId = process.env.EBAY_CLIENT_ID ?? ''
       if (!clientId) return new Response('EBAY_CLIENT_ID not configured on server', { status: 503 })
-      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
-      const redirectUri = encodeURIComponent(`${appUrl}/api/ebay/callback`)
+      const ruName = process.env.EBAY_RU_NAME ?? 'Oodo_Malachi-OodoMala-JaraWo-kfznigiq'
       const scopes = encodeURIComponent('https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly')
       const state = Buffer.from(`ebay-${Date.now()}`).toString('base64')
-      const authUrl = `https://auth.ebay.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}`
+      const authUrl = `https://auth.ebay.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(ruName)}&scope=${scopes}&state=${state}`
       return Response.redirect(authUrl, 302)
     }
 
@@ -897,7 +896,7 @@ Bun.serve({
         return new Response('Missing code or server config', { status: 400 })
       }
       const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
-      const redirectUri = `${appUrl}/api/ebay/callback`
+      const ruName = process.env.EBAY_RU_NAME ?? 'Oodo_Malachi-OodoMala-JaraWo-kfznigiq'
       try {
         const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
         const tokenRes = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
@@ -909,7 +908,7 @@ Bun.serve({
           body: new URLSearchParams({
             grant_type: 'authorization_code',
             code,
-            redirect_uri: redirectUri,
+            redirect_uri: ruName,
           }).toString(),
         })
         if (!tokenRes.ok) throw new Error(`eBay token exchange failed: ${tokenRes.status}`)

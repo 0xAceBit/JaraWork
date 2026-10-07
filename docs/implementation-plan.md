@@ -1,51 +1,36 @@
-Let me read everything before diagnosing — contract, agent backend, and the live chain state. Now read the `readOrderFields` function after the ABI fix and the `callEscrow` implementation to understand how the agent signs and sends transactions: Now I have the full picture. Let me check the current state of orders on chain and the agent-state.json:I'm in Plan mode. Let me give you the complete diagnosis and course of action based on everything I've read.
+Let me read the full eBay section of the agent to see what needs updating. The eBay OAuth flow is already fully wired. The issue is the `redirect_uri` — it's using the raw callback URL but eBay requires it to match exactly the **RuName** you registered, not a plain URL.I'm in Plan mode — I can't edit files directly. Here's the plan for what needs to change, then you can approve it to build:
 
 ---
 
-## Full Diagnosis
+## Implementation Plan: eBay OAuth RuName Fix
 
-### Problem 1: Agent auto-refunds orders immediately (confirmed root cause)
+### Summary
+The eBay OAuth install route uses a plain callback URL as `redirect_uri`, but eBay requires the registered **RuName** (`Oodo_Malachi-OodoMala-JaraWo-kfznigiq`) as the `redirect_uri` value. Also the token exchange callback needs to use the RuName too. Two lines need updating in `server/agent.ts`.
 
-The `readOrderFields` fix I wrote uses `decodeAbiParameters` but **the fix hasn't been pushed to Render yet** — you haven't pushed since the `375bdd5` commit. Render is still running the old broken decoder.
+### Files to Modify
+1. `server/agent.ts` — replace raw callback URL with RuName in `/ebay/install` route and `/ebay/callback` token exchange
 
-The old broken decoder reads `createdAt` from word index 8 of the raw ABI response. Because the struct has 4 dynamic string fields at the start, word 8 is actually an **ABI offset pointer** (~`0x160` = 352), not a Unix timestamp (~`1748000000`). So `now - 352 > 604800` is always true and every order looks 7+ days old → immediate auto-refund.
+### Changes
+**In `/ebay/install`:**
+- Replace `redirect_uri = encodeURIComponent(\`${appUrl}/api/ebay/callback\`)` with the RuName: `Oodo_Malachi-OodoMala-JaraWo-kfznigiq`
 
-**This is the #1 bug. Everything else flows from it.**
+**In `/ebay/callback` token exchange:**
+- Replace `redirect_uri: redirectUri` (the plain URL) with the RuName
 
-### Problem 2: CreateOrder crashes after tx confirms
+**Add to Render env vars:**
+- `EBAY_CLIENT_ID=OodoMala-JaraWork-PRD-3c614a5ee-30b58830`
+- `EBAY_RU_NAME=Oodo_Malachi-OodoMala-JaraWo-kfznigiq`
+- `EBAY_CLIENT_SECRET=<your Cert ID already added>`
 
-The `onCreated()` callback switches to the Orders tab. React tries to render `OrderCard` for the new order. `order.amount` is `undefined` while wagmi fetches it. `formatUnits(undefined, 6)` throws `toString of undefined` → ErrorBoundary catches it → blank "Something went wrong" screen.
+### Done When
+- [ ] Clicking "Connect eBay" in Marketplace Settings redirects to eBay's consent page
+- [ ] After approving, eBay redirects back to `jarawork.onrender.com/?ebay_connected=true`
+- [ ] Agent fetches real eBay seller orders on next poll cycle
 
-**This fix is also staged but not pushed.**
+## Ready to build?
 
-### Problem 3: "order exists" revert
+Switch to **Build mode** and I'll apply the two-line fix and push immediately. Plan saved. Switch to **Build mode** using the mode selector and I'll apply the fix and push in one step. Also make sure these three env vars are in Render before testing:
 
-The Order ID field was pre-filled with a static value. Submitting twice → same `keccak256(orderId)` key → contract reverts `"order exists"`.
-
-**This fix is also staged but not pushed.**
-
----
-
-## All three fixes are in commit `3fbe6b8` — staged locally, never pushed
-
-The push attempts all failed because the GitHub token expired. Every fix since `8a06c8c` is sitting in local commits only. Render is running code from 2 days ago.
-
----
-
-## Course of Action
-
-**Step 1 (now): Push all pending commits**
-Add a fresh token to `.env` and say "push it". This sends commits `c777c7c` through `3fbe6b8` to GitHub in one push — 6 commits worth of fixes including all three root causes above.
-
-**Step 2 (automatic): Render redeploys**
-Render auto-deploys on push. The new build includes the correct ABI decoder, null guards on OrderCard, and auto-generated order IDs.
-
-**Step 3: Verify the agent is no longer refunding**
-After deploy, create a test order. Watch the Agent tab action log. You should see no `refund_order` entries. The order should stay Open on the board.
-
-**Step 4 (if agent still refunds after push)**
-It means Render's agent process has the old `agent-state.json` cached with already-posted keys. Go to Render → JaraWork → **Shell** → run `rm server/agent-state.json` → restart the service. This clears the stale state.
-
----
-
-Add your token to `.env` and say "push it" to get all of this live now.
+- `EBAY_CLIENT_ID` = `OodoMala-JaraWork-PRD-3c614a5ee-30b58830`
+- `EBAY_RU_NAME` = `Oodo_Malachi-OodoMala-JaraWo-kfznigiq`
+- `EBAY_CLIENT_SECRET` = your Cert ID
