@@ -9,10 +9,10 @@ import { Bot, Zap, RefreshCw, Play, CheckCircle, XCircle, RotateCcw, Info, Exter
 import DisputeAdmin from './DisputeAdmin'
 import { TokenUSDC } from '@web3icons/react'
 import { buildTxExplorerUrl, buildAddressExplorerUrl } from '../onchain-facts'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { useSetPlatform } from '../hooks/useEscrow'
 
-const CHAIN_ID = arcTestnet.id
+const CHAIN_ID = arc.id
 
 interface AgentAction {
   timestamp: number
