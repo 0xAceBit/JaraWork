@@ -214,7 +214,7 @@ export function useAnalytics() {
   useEffect(() => {
   if (!client) return
   void load()
-}, [load, client])
+    }, [load, client])
 
 
   return { ...data, refresh: load }
