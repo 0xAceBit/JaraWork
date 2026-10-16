@@ -67,7 +67,7 @@ const EMPTY: AnalyticsData = {
 async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promise<Order[]> {
   if (!client) return []
 
-  // Step 1: get total count — 1 RPC call
+  // Step 1: total count — 1 RPC call
   const countRaw = await client.readContract({
     address: CONTRACT,
     abi: JARA_WORK_ESCROW_ABI,
@@ -76,31 +76,36 @@ async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promi
   const total = Number(countRaw)
   if (total === 0) return []
 
-  // Step 2: fetch all keys in batches of 50 — ceil(total/50) RPC calls
-  const keyBatches: `0x${string}`[][] = []
+  // Step 2: fetch all key batches in parallel
+  const offsets: number[] = []
   for (let offset = 0; offset < total; offset += BATCH) {
-    const keys = await client.readContract({
-      address: CONTRACT,
-      abi: JARA_WORK_ESCROW_ABI,
-      functionName: 'getOrderKeys',
-      args: [BigInt(offset), BigInt(BATCH)],
-    }) as `0x${string}`[]
-    keyBatches.push(keys)
+    offsets.push(offset)
   }
+  const keyBatches = await Promise.all(
+    offsets.map(offset =>
+      client.readContract({
+        address: CONTRACT,
+        abi: JARA_WORK_ESCROW_ABI,
+        functionName: 'getOrderKeys',
+        args: [BigInt(offset), BigInt(BATCH)],
+      }) as Promise<`0x${string}`[]>
+    )
+  )
   const allKeys = keyBatches.flat()
 
-  // Step 3: fetch all orders in one multicall — 1 RPC call regardless of order count
-  const results = await client.multicall({
-    contracts: allKeys.map(key => ({
-      address: CONTRACT,
-      abi: JARA_WORK_ESCROW_ABI,
-      functionName: 'getOrder' as const,
-      args: [key] as [`0x${string}`],
-    })),
-    allowFailure: false,
-  })
+  // Step 3: fetch all orders in parallel — no multicall contract needed
+  const orders = await Promise.all(
+    allKeys.map(key =>
+      client.readContract({
+        address: CONTRACT,
+        abi: JARA_WORK_ESCROW_ABI,
+        functionName: 'getOrder',
+        args: [key],
+      }) as Promise<Order>
+    )
+  )
 
-  return results as Order[]
+  return orders
 }
 
 
