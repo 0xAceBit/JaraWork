@@ -211,7 +211,11 @@ export function useAnalytics() {
     }
   }, [client])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+  if (!client) return
+  void load()
+}, [load, client])
+
 
   return { ...data, refresh: load }
 }
