@@ -3,14 +3,22 @@
  * Reads retroactively from the deployed JaraWorkEscrow contract on Arc Mainnet.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { createPublicClient, formatUnits } from 'viem'
+import { createPublicClient, http, formatUnits } from 'viem'
 import { arc } from 'viem/chains'
-import { usePublicClient } from 'wagmi'
 import { JARA_WORK_ESCROW_ABI } from '../contracts/jaraWorkEscrow'
 import type { Order } from '../contracts/jaraWorkEscrow'
 
 const CONTRACT = '0x52A34aD73fAe6Bd151F25F1BCDf13AA7781422d5' as const
 const BATCH = 50 // keys to fetch per getOrderKeys call
+
+const analyticsClient = createPublicClient({
+  chain: arc,
+  transport: http('https://rpc.mainnet.arc.io', {
+    timeout: 30_000,
+    retryCount: 3,
+    retryDelay: 1_000,
+  }),
+})
 
 export interface AnalyticsData {
   totalOrders: number
@@ -64,11 +72,9 @@ const EMPTY: AnalyticsData = {
   lastFetched: null,
 }
 
-async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promise<Order[]> {
-  if (!client) return []
-
+async function fetchAllOrders(): Promise<Order[]> {
   // Step 1: total count — 1 RPC call
-  const countRaw = await client.readContract({
+  const countRaw = await analyticsClient.readContract({
     address: CONTRACT,
     abi: JARA_WORK_ESCROW_ABI,
     functionName: 'getOrderCount',
@@ -83,7 +89,7 @@ async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promi
   }
   const keyBatches = await Promise.all(
     offsets.map(offset =>
-      client.readContract({
+      analyticsClient.readContract({
         address: CONTRACT,
         abi: JARA_WORK_ESCROW_ABI,
         functionName: 'getOrderKeys',
@@ -93,10 +99,10 @@ async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promi
   )
   const allKeys = keyBatches.flat()
 
-  // Step 3: fetch all orders in parallel — no multicall contract needed
+  // Step 3: fetch all orders in parallel
   const orders = await Promise.all(
     allKeys.map(key =>
-      client.readContract({
+      analyticsClient.readContract({
         address: CONTRACT,
         abi: JARA_WORK_ESCROW_ABI,
         functionName: 'getOrder',
@@ -206,25 +212,20 @@ function computeStats(orders: Order[]): Omit<AnalyticsData, 'loading' | 'error' 
 
 export function useAnalytics() {
   const [data, setData] = useState<AnalyticsData>({ ...EMPTY })
-  const client = usePublicClient({ chainId: arc.id })
 
   const load = useCallback(async () => {
     setData(prev => ({ ...prev, loading: true, error: null }))
     try {
-      if (!client) throw new Error('Arc Mainnet RPC client is unavailable')
-      const orders = await fetchAllOrders(client)
+      const orders = await fetchAllOrders()
       const stats = computeStats(orders)
       setData({ ...stats, loading: false, error: null, lastFetched: Date.now() })
     } catch (e) {
       setData(prev => ({ ...prev, loading: false, error: (e as Error).message }))
     }
-  }, [client])
+  }, [])
 
-  useEffect(() => {
-  if (!client) return
-  void load()
-    }, [load, client])
-
+  useEffect(() => { void load() }, [load])
 
   return { ...data, refresh: load }
 }
+
