@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ConnectKitButton } from 'connectkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutGrid, Plus, Briefcase, Settings, Bot, ArrowRight, ShieldCheck, Zap, Clock, ShieldAlert } from 'lucide-react'
+import { LayoutGrid, Plus, Briefcase, Settings, Bot, ArrowRight, ShieldCheck, Zap, Clock, ShieldAlert, BarChart2 } from 'lucide-react'
 import { NetworkArc } from '@web3icons/react'
 import OrderBoard from './components/OrderBoard'
 import CreateOrder from './components/CreateOrder'
@@ -10,10 +10,11 @@ import MyOrders from './components/MyOrders'
 import MarketplaceSettings from './components/MarketplaceSettings'
 import AgentStatus from './components/AgentStatus'
 import AdminPanel from './components/AdminPanel'
+import Analytics from './components/Analytics'
 import { useContractOwner } from './hooks/useEscrow'
 import { JARA_WORK_ESCROW } from './contracts/jaraWorkEscrow'
 
-type Tab = 'board' | 'create' | 'my-orders' | 'agent' | 'settings' | 'admin'
+type Tab = 'board' | 'create' | 'my-orders' | 'agent' | 'settings' | 'admin' | 'analytics'
 
 const BASE_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'board',     label: 'Orders',   icon: <LayoutGrid size={18} /> },
@@ -21,6 +22,7 @@ const BASE_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'my-orders', label: 'Mine',     icon: <Briefcase size={18} /> },
   { id: 'agent',     label: 'Agent',    icon: <Bot size={18} /> },
   { id: 'settings',  label: 'Settings', icon: <Settings size={18} /> },
+  { id: 'analytics', label: 'Stats',    icon: <BarChart2 size={18} /> },
 ]
 
 const fadeUp = {
@@ -213,7 +215,7 @@ export default function App() {
     ? [
         ...BASE_TABS.slice(0, 4),
         { id: 'admin' as Tab, label: 'Admin', icon: <ShieldAlert size={18} /> },
-        BASE_TABS[4],
+        ...BASE_TABS.slice(4),
       ]
     : BASE_TABS
 
@@ -422,6 +424,16 @@ export default function App() {
                   USDC held in escrow until delivery is confirmed.
                 </p>
               </div>
+            </motion.section>
+          )}
+
+          {tab === 'analytics' && (
+            <motion.section key="analytics" {...fadeUp}>
+              <PageHeader
+                label="Platform Analytics"
+                sub="Track order flow, payment volume, and on-chain platform health in real time."
+              />
+              <Analytics />
             </motion.section>
           )}
 
