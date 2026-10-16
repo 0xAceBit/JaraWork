@@ -3,21 +3,22 @@
  * Reads retroactively from the deployed JaraWorkEscrow contract on Arc Mainnet.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { createPublicClient, http, formatUnits } from 'viem'
 import { arc } from 'viem/chains'
 import { JARA_WORK_ESCROW_ABI } from '../contracts/jaraWorkEscrow'
 import type { Order } from '../contracts/jaraWorkEscrow'
+import { createPublicClient, http, fallback, formatUnits } from 'viem'
 
 const CONTRACT = '0x52A34aD73fAe6Bd151F25F1BCDf13AA7781422d5' as const
 const BATCH = 50 // keys to fetch per getOrderKeys call
 
 const analyticsClient = createPublicClient({
   chain: arc,
-  transport: http('https://rpc.mainnet.arc.io', {
-    timeout: 30_000,
-    retryCount: 3,
-    retryDelay: 1_000,
-  }),
+  transport: fallback([
+    http('https://rpc.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
+    http('https://rpc.quicknode.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
+    http('https://rpc.drpc.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
+    http('https://rpc.blockdaemon.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
+  ]),
 })
 
 export interface AnalyticsData {
