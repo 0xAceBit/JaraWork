@@ -64,7 +64,10 @@ const EMPTY: AnalyticsData = {
   lastFetched: null,
 }
 
-async function fetchAllOrders(client: ReturnType<typeof createPublicClient>): Promise<Order[]> {
+async function fetchAllOrders(client: ReturnType<typeof usePublicClient>): Promise<Order[]> {
+  if (!client) return []
+
+  // Step 1: get total count — 1 RPC call
   const countRaw = await client.readContract({
     address: CONTRACT,
     abi: JARA_WORK_ESCROW_ABI,
@@ -73,7 +76,7 @@ async function fetchAllOrders(client: ReturnType<typeof createPublicClient>): Pr
   const total = Number(countRaw)
   if (total === 0) return []
 
-  // Fetch all keys in batches
+  // Step 2: fetch all keys in batches of 50 — ceil(total/50) RPC calls
   const keyBatches: `0x${string}`[][] = []
   for (let offset = 0; offset < total; offset += BATCH) {
     const keys = await client.readContract({
@@ -86,19 +89,20 @@ async function fetchAllOrders(client: ReturnType<typeof createPublicClient>): Pr
   }
   const allKeys = keyBatches.flat()
 
-  // Fetch each order — batch with multicall if available, else sequential
-  const orders: Order[] = []
-  for (const key of allKeys) {
-    const order = await client.readContract({
+  // Step 3: fetch all orders in one multicall — 1 RPC call regardless of order count
+  const results = await client.multicall({
+    contracts: allKeys.map(key => ({
       address: CONTRACT,
       abi: JARA_WORK_ESCROW_ABI,
-      functionName: 'getOrder',
-      args: [key],
-    }) as Order
-    orders.push(order)
-  }
-  return orders
+      functionName: 'getOrder' as const,
+      args: [key] as [`0x${string}`],
+    })),
+    allowFailure: false,
+  })
+
+  return results as Order[]
 }
+
 
 function computeStats(orders: Order[]): Omit<AnalyticsData, 'loading' | 'error' | 'lastFetched'> {
   const byStatus = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
