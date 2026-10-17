@@ -18,6 +18,9 @@ const analyticsClient = createPublicClient({
     http('https://rpc.quicknode.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
     http('https://rpc.drpc.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
     http('https://rpc.blockdaemon.mainnet.arc.io', { timeout: 15_000, retryCount: 1 }),
+    http('https://arc.drpc.org', { timeout: 15_000, retryCount: 1 }),
+    http('https://rpc.beamrpc.com', { timeout: 15_000, retryCount: 1 }),
+    http('https://arc-rpc.blockreq.com/v1/rpc/public', { timeout: 15_000, retryCount: 1 }),
   ]),
 })
 
