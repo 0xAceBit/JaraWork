@@ -1,6 +1,6 @@
 # JaraWork — Order-to-Earner Marketplace
 
-> **Live app:** [jarawork.onrender.com](https://jarawork.onrender.com)  
+> **Live app:** [jarawork.online](https://jarawork.online)  
 > **Network:** Arc Mainnet (Chain ID 5042) · USDC native gas  
 > **Contract:** [`0x52A34aD73fAe6Bd151F25F1BCDf13AA7781422d5`](https://explorer.arc.io/address/0x52A34aD73fAe6Bd151F25F1BCDf13AA7781422d5)
 
