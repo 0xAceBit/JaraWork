@@ -12,11 +12,16 @@ import { registerChain } from './tracing'
 // Arc Mainnet — viem's arc entry has an empty rpcUrls array so we override it
 // Multiple public Arc Mainnet RPCs — tested working, ordered by latency
 const ARC_RPCS = [
-  'https://rpc.mainnet.arc.io',            // Circle primary
-  'https://rpc.quicknode.mainnet.arc.io',  // 70ms
-  'https://rpc.drpc.mainnet.arc.io',       // 127ms
-  'https://rpc.blockdaemon.mainnet.arc.io',// 482ms
-  'https://rpc.nodeflare.app/arc/public',  // 504ms
+  'https://rpc.mainnet.arc.io/',            // Circle primary
+  'https://rpc.quicknode.mainnet.arc.io/',  // 70ms
+  'https://rpc.drpc.mainnet.arc.io/',       // 127ms
+  'https://rpc.blockdaemon.mainnet.arc.io/',// 482ms
+  'https://rpc.nodeflare.app/arc/public/',  // 504ms (not on arc.io)
+  // Backups on non-arc.io domains, for visitors whose blocker blocks arc.io.
+  // From chainlist.org, not latency-tested yet.
+  'https://arc.drpc.org/',
+  'https://rpc.beamrpc.com/',
+  'https://arc-rpc.blockreq.com/v1/rpc/public',
 ] as const
 
 const arc = {
