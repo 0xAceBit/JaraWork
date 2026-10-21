@@ -109,8 +109,8 @@ export default function TermsOfService() {
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>12. Contact</h3>
         <p>
           For questions about these Terms of Service, contact Ace Corporation at{' '}
-          <a href="mailto:legal@acecorporation.ng" style={{ color: 'var(--accent)' }}>
-            legal@acecorporation.ng
+          <a href="mailto:info@acecorporation.com.ng" style={{ color: 'var(--accent)' }}>
+            info@acecorporation.com.ng
           </a>.
         </p>
       </section>
