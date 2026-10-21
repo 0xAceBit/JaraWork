@@ -6,7 +6,7 @@ export default function TermsOfService() {
       <section>
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>1. About JaraWork</h3>
         <p>
-          JaraWork is an Order-to-Earner Marketplace operated by Ace Corporation, a company registered in Nigeria.
+          JaraWork is an Order-to-Earner Marketplace operated by Ace Corporation, a company registered in the United States of America.
           JaraWork connects sellers and workers through a smart contract escrow system on the Arc blockchain.
           By accessing or using JaraWork at jarawork.onrender.com you agree to be bound by these Terms of Service.
         </p>
@@ -66,7 +66,7 @@ export default function TermsOfService() {
           <li>Engage in fraudulent, deceptive, or misleading conduct</li>
           <li>Post orders or submit delivery proof that is false or fabricated</li>
           <li>Attempt to manipulate or exploit the smart contract</li>
-          <li>Violate any applicable Nigerian or international law</li>
+          <li>Violate any applicable United States or international law</li>
           <li>Use the platform for money laundering or financing of illegal activities</li>
         </ul>
       </section>
@@ -83,7 +83,7 @@ export default function TermsOfService() {
       <section>
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>9. Limitation of Liability</h3>
         <p>
-          To the fullest extent permitted by Nigerian law, Ace Corporation shall not be liable for any indirect,
+          To the fullest extent permitted by United States law, Ace Corporation shall not be liable for any indirect,
           incidental, special, or consequential damages arising from your use of JaraWork, including loss of funds
           due to smart contract interactions, wallet errors, or blockchain network issues.
         </p>
@@ -92,8 +92,8 @@ export default function TermsOfService() {
       <section>
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>10. Governing Law</h3>
         <p>
-          These Terms are governed by and construed in accordance with the laws of the Federal Republic of Nigeria.
-          Any disputes arising from these Terms shall be subject to the exclusive jurisdiction of the courts of Nigeria.
+          These Terms are governed by and construed in accordance with the laws of the United States of America.
+          Any disputes arising from these Terms shall be subject to the exclusive jurisdiction of the courts of the United States.
         </p>
       </section>
 

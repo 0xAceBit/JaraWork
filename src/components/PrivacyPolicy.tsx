@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
       <section>
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>1. Who We Are</h3>
         <p>
-          JaraWork is operated by Ace Corporation, a company registered in Nigeria. This Privacy Policy explains
+          JaraWork is operated by Ace Corporation, a company registered in the United States of America. This Privacy Policy explains
           how we collect, use, and protect information when you use JaraWork at jarawork.onrender.com.
           For questions, contact us at{' '}
           <a href="mailto:legal@acecorporation.ng" style={{ color: 'var(--accent)' }}>
@@ -119,8 +119,8 @@ export default function PrivacyPolicy() {
       <section>
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>11. Governing Law</h3>
         <p>
-          This Privacy Policy is governed by the laws of the Federal Republic of Nigeria, including the
-          Nigeria Data Protection Regulation (NDPR).
+          This Privacy Policy is governed by the laws of the United States of America, including applicable federal and state privacy laws.
+          
         </p>
       </section>
 
