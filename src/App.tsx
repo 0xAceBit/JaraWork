@@ -11,6 +11,7 @@ import MarketplaceSettings from './components/MarketplaceSettings'
 import AgentStatus from './components/AgentStatus'
 import AdminPanel from './components/AdminPanel'
 import Analytics from './components/Analytics'
+import Footer from './components/Footer'
 import { useContractOwner } from './hooks/useEscrow'
 import { JARA_WORK_ESCROW } from './contracts/jaraWorkEscrow'
 
@@ -439,6 +440,8 @@ export default function App() {
 
         </AnimatePresence>
       </main>
+
+      <Footer />
 
       {/* Bottom nav — warm cream */}
       <nav
