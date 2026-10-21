@@ -300,7 +300,7 @@ export default function App() {
         {/* Order Board — always mounted, hidden when off-tab so state never resets */}
         <section style={{ display: tab === 'board' ? 'block' : 'none' }}>
           {/* Hero always visible on board tab */}
-          <HeroSection onPost={() => setTab('create')} onBrowse={() => {}} />
+          <HeroSection onPost={() => setTab('create')} onBrowse={() => { document.getElementById('order-board-top')?.scrollIntoView({ behavior: 'smooth' }) }} />
 
           {/* Compact action bar — only when connected */}
           {isConnected && (
@@ -336,6 +336,7 @@ export default function App() {
               </button>
             </motion.div>
           )}
+          <div id="order-board-top" />
           <OrderBoard externalRefreshSeed={boardRefreshSeed} />
         </section>
 
