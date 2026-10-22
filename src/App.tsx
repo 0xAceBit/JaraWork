@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import LandingPage from './components/LandingPage'
 import { ConnectKitButton } from 'connectkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -176,6 +177,14 @@ function PageHeader({ label, sub }: { label: string; sub: string }) {
 
 /* ─── App ───────────────────────────────────────────────────────── */
 export default function App() {
+  const [showLanding, setShowLanding] = useState(() => {
+    try { return localStorage.getItem('jw_entered') !== '1' } catch { return true }
+  })
+  const enterApp = useCallback(() => {
+    try { localStorage.setItem('jw_entered', '1') } catch { /* noop */ }
+    setShowLanding(false)
+  }, [])
+
   const [tab, setTab] = useState<Tab>('board')
   const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
   const { isConnected, address } = useAccount()
@@ -220,6 +229,8 @@ export default function App() {
       ]
     : BASE_TABS
 
+  if (showLanding) return <LandingPage onEnterApp={enterApp} />
+
   return (
     <div className="min-h-dvh relative" style={{ background: 'var(--bg-gradient)' }}>
 
@@ -251,7 +262,7 @@ export default function App() {
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
-            onClick={() => setTab('board')}
+            onClick={() => { localStorage.removeItem('jw_entered'); setShowLanding(true) }}
             className="flex items-center gap-2.5 focus:outline-none"
           >
             {/* Logo mark */}

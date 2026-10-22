@@ -135,7 +135,7 @@ function computeStats(orders: Order[]): Omit<AnalyticsData, 'loading' | 'error' 
   let completionDelayCount = 0
 
   for (const o of orders) {
-    byStatus[o.status as 0|1|2|3|4|5]++
+    byStatus[o.status]++
 
     buyers.add(o.buyer.toLowerCase())
     if (o.worker && o.worker !== '0x0000000000000000000000000000000000000000') {
