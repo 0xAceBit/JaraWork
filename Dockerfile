@@ -7,21 +7,9 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
-# Accept VITE_ build-time env vars as Docker build args
-ARG VITE_CLIENT_KEY
-ARG VITE_CLIENT_URL
-ARG VITE_GAS_POLICY_ID
-ARG VITE_MAINNET_ESCROW_CONTRACT_ADDRESS
-ARG VITE_MAINNET_AGENT_WALLET_ADDRESS
-
 # Copy source and build frontend
 COPY . .
-RUN VITE_CLIENT_KEY=$VITE_CLIENT_KEY \
-    VITE_CLIENT_URL=$VITE_CLIENT_URL \
-    VITE_GAS_POLICY_ID=$VITE_GAS_POLICY_ID \
-    VITE_MAINNET_ESCROW_CONTRACT_ADDRESS=$VITE_MAINNET_ESCROW_CONTRACT_ADDRESS \
-    VITE_MAINNET_AGENT_WALLET_ADDRESS=$VITE_MAINNET_AGENT_WALLET_ADDRESS \
-    bun run build
+RUN bun run build
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM oven/bun:1.4.4-slim AS runner
