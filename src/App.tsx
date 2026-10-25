@@ -197,6 +197,11 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('board')
   const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
   const { isConnected, address: wagmiAddress } = useAccount()
+
+  // Auto-advance past landing page when a wallet connects
+  useEffect(() => {
+    if (isConnected) enterApp()
+  }, [isConnected, enterApp])
   const address = passkeyAddress ?? wagmiAddress
   const isConnectedEffective = isConnected || !!passkeyAddress
   const chainId = useChainId()
