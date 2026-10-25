@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Wallet, ArrowRight, CheckCircle2, X, Loader2, Fingerprint, AlertCircle } from 'lucide-react'
 import { createPublicClient } from 'viem'
@@ -10,19 +10,9 @@ import {
   toPasskeyTransport,
   toWebAuthnCredential,
 } from '@circle-fin/modular-wallets-core'
-
 import { createBundlerClient, toWebAuthnAccount, type WebAuthnAccount } from 'viem/account-abstraction'
 
 type P256Credential = Awaited<ReturnType<typeof toWebAuthnCredential>>
-
-const clientKey = import.meta.env.VITE_CLIENT_KEY as string
-const clientUrl = import.meta.env.VITE_CLIENT_URL as string
-
-const passkeyTransport = toPasskeyTransport(clientUrl, clientKey)
-const modularTransport = toModularTransport(`${clientUrl}/arc`, clientKey)
-
-const publicClient = createPublicClient({ chain: arc, transport: modularTransport })
-const bundlerClient = createBundlerClient({ chain: arc, transport: modularTransport })
 
 type Screen = 'choose' | 'passkey-register' | 'passkey-login' | 'creating' | 'success' | 'error'
 
@@ -49,20 +39,34 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
   const [error, setError] = useState('')
   const [walletAddress, setWalletAddress] = useState('')
 
+  // Lazy-initialize transports so missing env vars don't crash the module on import
+  const clients = useMemo(() => {
+    const clientKey = import.meta.env.VITE_CLIENT_KEY as string | undefined
+    const clientUrl = import.meta.env.VITE_CLIENT_URL as string | undefined
+    if (!clientKey || !clientUrl) return null
+    const passkeyTransport = toPasskeyTransport(clientUrl, clientKey)
+    const modularTransport = toModularTransport(`${clientUrl}/arc`, clientKey)
+    const publicClient = createPublicClient({ chain: arc, transport: modularTransport })
+    const bundlerClient = createBundlerClient({ chain: arc, transport: modularTransport })
+    return { passkeyTransport, publicClient, bundlerClient }
+  }, [])
+
   // Restore existing session on mount
   useEffect(() => {
     const stored = localStorage.getItem('jw_passkey_credential')
-    if (stored) {
+    if (stored && clients) {
       const credential = JSON.parse(stored) as P256Credential
       setScreen('creating')
       restoreSession(credential)
     }
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients])
 
   async function restoreSession(credential: P256Credential) {
+    if (!clients) { setScreen('choose'); return }
     try {
       const account = await toCircleSmartAccount({
-        client: publicClient,
+        client: clients.publicClient,
         owner: toWebAuthnAccount({ credential }),
       })
       setWalletAddress(account.address)
@@ -75,18 +79,18 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
   }
 
   async function handleRegister() {
-    if (!username.trim()) return
+    if (!username.trim() || !clients) return
     setScreen('creating')
     setError('')
     try {
       const credential = await toWebAuthnCredential({
-        transport: passkeyTransport,
+        transport: clients.passkeyTransport,
         mode: WebAuthnMode.Register,
         username: username.trim(),
       })
       localStorage.setItem('jw_passkey_credential', JSON.stringify(credential))
       const account = await toCircleSmartAccount({
-        client: publicClient,
+        client: clients.publicClient,
         owner: toWebAuthnAccount({ credential }),
       })
       setWalletAddress(account.address)
@@ -95,7 +99,6 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       if (msg.includes('InvalidStateError') || msg.includes('already registered')) {
-        // Credential exists — switch to login
         handleLogin()
       } else {
         setError(msg.includes('NotAllowedError') ? 'Passkey prompt was cancelled. Try again.' : msg)
@@ -105,16 +108,17 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
   }
 
   async function handleLogin() {
+    if (!clients) return
     setScreen('creating')
     setError('')
     try {
       const credential = await toWebAuthnCredential({
-        transport: passkeyTransport,
+        transport: clients.passkeyTransport,
         mode: WebAuthnMode.Login,
       })
       localStorage.setItem('jw_passkey_credential', JSON.stringify(credential))
       const account = await toCircleSmartAccount({
-        client: publicClient,
+        client: clients.publicClient,
         owner: toWebAuthnAccount({ credential }),
       })
       setWalletAddress(account.address)
@@ -125,6 +129,44 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
       setError(msg.includes('NotAllowedError') ? 'Passkey prompt was cancelled. Try again.' : msg)
       setScreen('error')
     }
+  }
+
+  // If Circle keys aren't configured, show a graceful fallback
+  if (!clients) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        >
+          <motion.div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+          <motion.div
+            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+            initial={{ scale: 0.92, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.92, opacity: 0, y: 20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600" />
+            <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors z-10">
+              <X size={16} />
+            </button>
+            <div className="px-6 pb-8 pt-6 flex flex-col items-center text-center">
+              <JaraLogo />
+              <h2 className="text-lg font-bold text-stone-900 mt-4 mb-2">Passkey sign-in unavailable</h2>
+              <p className="text-sm text-stone-500 mb-5">Use Connect Wallet to get started.</p>
+              <button
+                onClick={() => { onClose(); onConnectWallet() }}
+                className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl border border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50 transition-all"
+              >
+                <Wallet size={20} className="text-stone-600" />
+                <span className="font-semibold text-stone-900 text-sm">Connect Wallet</span>
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    )
   }
 
   return (
@@ -191,7 +233,10 @@ export default function SignIn({ onClose, onConnectWallet, onEnterApp }: Props) 
                   <ArrowRight size={16} className="text-orange-400 group-hover:text-orange-600 transition-colors" />
                 </button>
 
-                <p className="text-center text-xs text-stone-400 mb-3">Already have a passkey? <button onClick={handleLogin} className="text-orange-500 hover:underline font-medium">Sign in</button></p>
+                <p className="text-center text-xs text-stone-400 mb-3">
+                  Already have a passkey?{' '}
+                  <button onClick={handleLogin} className="text-orange-500 hover:underline font-medium">Sign in</button>
+                </p>
 
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1 h-px bg-stone-200" />
