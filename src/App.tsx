@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import LandingPage from './components/LandingPage'
 import SignIn from './components/SignIn'
 import { toWebAuthnCredential } from '@circle-fin/modular-wallets-core'
-import { ConnectKitButton } from 'connectkit'
+import { ConnectKitButton, useModal } from 'connectkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutGrid, Plus, Briefcase, Settings, Bot, ArrowRight, ShieldCheck, Zap, Clock, ShieldAlert, BarChart2 } from 'lucide-react'
@@ -192,6 +192,7 @@ export default function App() {
   const [showSignIn, setShowSignIn] = useState(false)
   const [passkeyAddress, setPasskeyAddress] = useState<string | null>(null)
   const [, setPasskeyCredential] = useState<P256Credential | null>(null)
+  const { setOpen: openConnectKit } = useModal()
 
   const [tab, setTab] = useState<Tab>('board')
   const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
@@ -245,7 +246,7 @@ export default function App() {
       {showSignIn && (
         <SignIn
           onClose={() => setShowSignIn(false)}
-          onConnectWallet={() => setShowSignIn(false)}
+          onConnectWallet={() => { setShowSignIn(false); openConnectKit(true) }}
           onEnterApp={(addr, cred) => {
             setPasskeyAddress(addr)
             setPasskeyCredential(cred)
@@ -352,7 +353,7 @@ export default function App() {
       {showSignIn && (
         <SignIn
           onClose={() => setShowSignIn(false)}
-          onConnectWallet={() => setShowSignIn(false)}
+          onConnectWallet={() => { setShowSignIn(false); openConnectKit(true) }}
           onEnterApp={(addr, cred) => {
             setPasskeyAddress(addr)
             setPasskeyCredential(cred)
