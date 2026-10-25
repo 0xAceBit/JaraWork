@@ -294,7 +294,15 @@ export default function App() {
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
-            onClick={() => { localStorage.removeItem('jw_entered'); setShowLanding(true) }}
+            onClick={() => {
+              if (isConnectedEffective) {
+                setShowLanding(false)
+                setTab('board')
+              } else {
+                localStorage.removeItem('jw_entered')
+                setShowLanding(true)
+              }
+            }}
             className="flex items-center gap-2.5 focus:outline-none"
           >
             {/* Logo mark */}
