@@ -809,7 +809,7 @@ Bun.serve({
       }
       const clientId = process.env.SHOPIFY_CLIENT_ID ?? ''
       if (!clientId) return new Response('SHOPIFY_CLIENT_ID not configured on server', { status: 503 })
-      const redirectUri = encodeURIComponent(`${process.env.APP_URL ?? 'https://jarawork.onrender.com'}/api/shopify/callback`)
+      const redirectUri = encodeURIComponent(`${process.env.APP_URL ?? 'https://jarawork.online'}/api/shopify/callback`)
       const scopes = 'read_orders,read_fulfillments'
       const state = Buffer.from(`${Date.now()}-${shop}`).toString('base64')
       const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`
@@ -840,7 +840,7 @@ Bun.serve({
         shopifyTokens.set(shop, accessToken)
         logAction({ timestamp: Date.now(), type: 'info', message: `Shopify connected: ${shop}` })
         // Redirect back to app with success flag
-        const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+        const appUrl = process.env.APP_URL ?? 'https://jarawork.online'
         return Response.redirect(`${appUrl}/?shopify_connected=${encodeURIComponent(shop)}`, 302)
       } catch (e) {
         logAction({ timestamp: Date.now(), type: 'error', message: `Shopify OAuth error: ${(e as Error).message}` })
@@ -895,7 +895,7 @@ Bun.serve({
       if (!code || !clientId || !clientSecret) {
         return new Response('Missing code or server config', { status: 400 })
       }
-      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.online'
       const ruName = process.env.EBAY_RU_NAME ?? 'Oodo_Malachi-OodoMala-JaraWo-kfznigiq'
       try {
         const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
@@ -977,7 +977,7 @@ Bun.serve({
     if (path === '/amazon/install' && req.method === 'GET') {
       const clientId = process.env.AMAZON_CLIENT_ID ?? process.env.AMAZON_LWA_CLIENT_ID ?? ''
       if (!clientId) return new Response('AMAZON_CLIENT_ID not configured on server', { status: 503 })
-      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.online'
       const redirectUri = encodeURIComponent(`${appUrl}/api/amazon/callback`)
       const state = Buffer.from(`amazon-${Date.now()}`).toString('base64')
       // SP-API application_id must also be set for the /apps/authorize endpoint
@@ -997,7 +997,7 @@ Bun.serve({
       if (!spApiOauthCode || !clientId || !clientSecret) {
         return new Response('Missing spapi_oauth_code or server config', { status: 400 })
       }
-      const appUrl = process.env.APP_URL ?? 'https://jarawork.onrender.com'
+      const appUrl = process.env.APP_URL ?? 'https://jarawork.online'
       try {
         const tokenRes = await fetch('https://api.amazon.com/auth/o2/token', {
           method: 'POST',

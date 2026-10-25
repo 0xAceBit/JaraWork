@@ -7,7 +7,7 @@ export default function PrivacyPolicy() {
         <h3 className="font-bold mb-1" style={{ color: 'var(--accent)' }}>1. Who We Are</h3>
         <p>
           JaraWork is operated by Ace Corporation, a company registered in the United States of America. This Privacy Policy explains
-          how we collect, use, and protect information when you use JaraWork at jarawork.onrender.com.
+          how we collect, use, and protect information when you use JaraWork at jarawork.online.
           For questions, contact us at{' '}
           <a href="mailto:info@acecorporation.com.ng" style={{ color: 'var(--accent)' }}>
             info@acecorporation.com.ng

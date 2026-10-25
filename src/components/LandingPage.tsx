@@ -1,9 +1,10 @@
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Zap, Clock, Bot, Globe, ArrowRight, Github } from 'lucide-react'
 import { NetworkArc } from '@web3icons/react'
-
 interface LandingPageProps {
   onEnterApp: () => void
+  onSignIn?: () => void
 }
 
 function XIcon({ size = 16 }: { size?: number }) {
@@ -49,7 +50,12 @@ const STEPS = [
 
 const MARKETPLACES = ['eBay', 'Amazon', 'Shopify', 'Jumia', 'Jaramarket']
 
-export default function LandingPage({ onEnterApp }: LandingPageProps) {
+export default function LandingPage({ onEnterApp, onSignIn }: LandingPageProps) {
+  const [showSignIn, setShowSignIn] = useState(false) // fallback: unused when onSignIn prop provided
+  const openSignIn = () => { if (onSignIn) { onSignIn() } else { setShowSignIn(true) } }
+  // suppress unused warning when SignInPreview removed
+  void showSignIn
+
   return (
     <div style={{ background: 'var(--bg-gradient)', minHeight: '100dvh', color: 'var(--ink)' }}>
 
@@ -82,11 +88,11 @@ export default function LandingPage({ onEnterApp }: LandingPageProps) {
           </div>
           {/* CTA */}
           <button
-            onClick={onEnterApp}
+            onClick={openSignIn}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 hover:opacity-90"
             style={{ background: 'linear-gradient(145deg, #e8700a, #c75f00)', color: '#fff', boxShadow: '0 3px 12px rgba(232,112,10,0.28)' }}
           >
-            Launch App <ArrowRight size={14} />
+            Get Started <ArrowRight size={14} />
           </button>
         </div>
       </nav>
@@ -131,11 +137,11 @@ export default function LandingPage({ onEnterApp }: LandingPageProps) {
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <button
-                onClick={onEnterApp}
+                onClick={openSignIn}
                 className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-base transition-all active:scale-95 hover:opacity-90"
                 style={{ background: '#fff', color: '#c75f00', boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}
               >
-                Launch App <ArrowRight size={16} />
+                Get Started <ArrowRight size={16} />
               </button>
               <a
                 href="https://github.com/0xAceBit/JaraWork"

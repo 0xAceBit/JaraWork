@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import LandingPage from './components/LandingPage'
+import SignIn from './components/SignIn'
+import { toWebAuthnCredential } from '@circle-fin/modular-wallets-core'
 import { ConnectKitButton } from 'connectkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,6 +17,8 @@ import Analytics from './components/Analytics'
 import Footer from './components/Footer'
 import { useContractOwner } from './hooks/useEscrow'
 import { JARA_WORK_ESCROW } from './contracts/jaraWorkEscrow'
+
+type P256Credential = Awaited<ReturnType<typeof toWebAuthnCredential>>
 
 type Tab = 'board' | 'create' | 'my-orders' | 'agent' | 'settings' | 'admin' | 'analytics'
 
@@ -185,9 +189,15 @@ export default function App() {
     setShowLanding(false)
   }, [])
 
+  const [showSignIn, setShowSignIn] = useState(false)
+  const [passkeyAddress, setPasskeyAddress] = useState<string | null>(null)
+  const [, setPasskeyCredential] = useState<P256Credential | null>(null)
+
   const [tab, setTab] = useState<Tab>('board')
   const [boardRefreshSeed, setBoardRefreshSeed] = useState(0)
-  const { isConnected, address } = useAccount()
+  const { isConnected, address: wagmiAddress } = useAccount()
+  const address = passkeyAddress ?? wagmiAddress
+  const isConnectedEffective = isConnected || !!passkeyAddress
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
   const ARC_MAINNET_ID = 5042
@@ -229,7 +239,23 @@ export default function App() {
       ]
     : BASE_TABS
 
-  if (showLanding) return <LandingPage onEnterApp={enterApp} />
+  if (showLanding) return (
+    <>
+      <LandingPage onEnterApp={enterApp} onSignIn={() => setShowSignIn(true)} />
+      {showSignIn && (
+        <SignIn
+          onClose={() => setShowSignIn(false)}
+          onConnectWallet={() => setShowSignIn(false)}
+          onEnterApp={(addr, cred) => {
+            setPasskeyAddress(addr)
+            setPasskeyCredential(cred)
+            setShowSignIn(false)
+            enterApp()
+          }}
+        />
+      )}
+    </>
+  )
 
   return (
     <div className="min-h-dvh relative" style={{ background: 'var(--bg-gradient)' }}>
@@ -301,9 +327,40 @@ export default function App() {
               <p className="text-xs" style={{ color: 'var(--subtle)' }}>Order-to-Earner</p>
             </div>
           </button>
-          <ConnectKitButton />
+          <div className="flex items-center gap-2">
+            {!isConnectedEffective && (
+              <button
+                onClick={() => setShowSignIn(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors"
+                style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: 'rgba(232,112,10,0.06)' }}
+              >
+                Sign in
+              </button>
+            )}
+            {passkeyAddress && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold" style={{ background: 'rgba(232,112,10,0.10)', color: 'var(--accent)' }}>
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                {passkeyAddress.slice(0, 6)}...{passkeyAddress.slice(-4)}
+              </div>
+            )}
+            {!passkeyAddress && <ConnectKitButton />}
+          </div>
         </div>
       </header>
+
+      {/* SignIn modal */}
+      {showSignIn && (
+        <SignIn
+          onClose={() => setShowSignIn(false)}
+          onConnectWallet={() => setShowSignIn(false)}
+          onEnterApp={(addr, cred) => {
+            setPasskeyAddress(addr)
+            setPasskeyCredential(cred)
+            setShowSignIn(false)
+            enterApp()
+          }}
+        />
+      )}
 
       {/* Body */}
       <main className="relative z-10 max-w-2xl mx-auto px-4 py-6 pb-28">
@@ -314,7 +371,7 @@ export default function App() {
           <HeroSection onPost={() => setTab('create')} onBrowse={() => { document.getElementById('order-board-top')?.scrollIntoView({ behavior: 'smooth' }) }} />
 
           {/* Compact action bar — only when connected */}
-          {isConnected && (
+          {isConnectedEffective && (
             <motion.div
               className="rounded-2xl px-4 py-3 mb-5 flex items-center justify-between gap-3"
               initial={{ opacity: 0, y: 10 }}

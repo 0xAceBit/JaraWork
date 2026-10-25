@@ -8,7 +8,7 @@ export default function TermsOfService() {
         <p>
           JaraWork is an Order-to-Earner Marketplace operated by Ace Corporation, a company registered in the United States of America.
           JaraWork connects sellers and workers through a smart contract escrow system on the Arc blockchain.
-          By accessing or using JaraWork at jarawork.onrender.com you agree to be bound by these Terms of Service.
+          By accessing or using JaraWork at jarawork.online you agree to be bound by these Terms of Service.
         </p>
       </section>
 
