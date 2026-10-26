@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import LandingPage from './components/LandingPage'
 import SignIn from './components/SignIn'
+import PasskeyUserMenu from './components/PasskeyUserMenu'
 import { toWebAuthnCredential } from '@circle-fin/modular-wallets-core'
 import { ConnectKitButton, useModal } from 'connectkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
@@ -352,10 +353,15 @@ export default function App() {
               </button>
             )}
             {passkeyAddress && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold" style={{ background: 'rgba(232,112,10,0.10)', color: 'var(--accent)' }}>
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                {passkeyAddress.slice(0, 6)}...{passkeyAddress.slice(-4)}
-              </div>
+              <PasskeyUserMenu
+                address={passkeyAddress}
+                onDisconnect={() => {
+                  setPasskeyAddress(null)
+                  setPasskeyCredential(null)
+                  localStorage.removeItem('jw_entered')
+                  setShowLanding(true)
+                }}
+              />
             )}
             {!passkeyAddress && <ConnectKitButton />}
           </div>
