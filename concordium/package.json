@@ -5,15 +5,21 @@
   "type": "module",
   "description": "Isolated Concordium hackathon module. Not part of the live JaraWork build.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/validator.test.ts",
-    "smoke": "node smoke/run.ts"
+    "smoke": "node smoke/run.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "block": "node scripts/latest-block.ts"
   },
   "dependencies": {
     "@concordium/web-sdk": "12.0.2",
     "@grpc/grpc-js": "1.14.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
   }
 }
