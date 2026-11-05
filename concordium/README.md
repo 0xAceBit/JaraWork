@@ -72,3 +72,24 @@ Keep this separate from the live JaraWork service.
 - `docs/04-plan.md`: day-by-day plan to Nov 22 and Dec 9.
 - `docs/05-cut-list-and-scope.md`: cut order and scope-creep challenges.
 - `trajectory/`: a log of every working session.
+
+## Registering the agent on testnet
+
+Run from `concordium/`. All steps are rerunnable and print every request and response.
+
+```bash
+node scripts/registry/01-build-card.ts          # build the Agent Card, save exact bytes
+# commit and push public/agent-card.json, then:
+node scripts/registry/02-check-hosted.ts --wait # hash what the public URL really serves
+node scripts/registry/03-build-register.ts      # sign-ready register payload
+node scripts/registry/04-sign-submit.ts         # dry run: simulates on the node, sends nothing
+node scripts/registry/04-sign-submit.ts --submit  # signs with CCD_OWNER_PRIVATE_KEY and submits
+node scripts/registry/05-verify.ts              # agent_of, is_active, verify_agent_card, check_badge
+node scripts/registry/06-build-badge.ts         # add the badge to the card
+# commit and push, then 02-check-hosted.ts --wait, then:
+node scripts/registry/07-build-set-agent-uri.ts # payload to pin the new hash
+node scripts/registry/04-sign-submit.ts --payload .data/set-agent-uri-payload.json --submit
+node scripts/registry/05-verify.ts
+```
+
+The signing key lives only in `concordium/.env` (git-ignored). See `.env.example`.
