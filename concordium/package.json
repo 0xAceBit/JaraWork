@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Isolated Concordium hackathon module. Not part of the live JaraWork build.",
   "scripts": {
+    "start": "node server.mjs",
     "smoke:bun": "bun run smoke/run.ts",
     "smoke:node": "node --experimental-strip-types smoke/run.ts"
   },

@@ -2,7 +2,8 @@
  * Day-one compatibility smoke test for @concordium/web-sdk.
  * Run under Bun and under Node and compare. Read-only, no keys, no funds.
  */
-const runtime = typeof (globalThis as any).Bun !== 'undefined' ? `bun ${(globalThis as any).Bun.version}` : `node ${process.version}`
+const bunGlobal = (globalThis as { Bun?: { version: string } }).Bun
+const runtime = bunGlobal ? `bun ${bunGlobal.version}` : `node ${process.version}`
 const TESTNET_HOST = 'grpc.testnet.concordium.com'
 const TESTNET_PORT = 20000
 const REGISTRY = 'https://agent-registry-mcp.concordium.com'
@@ -28,9 +29,9 @@ await step('1. import @concordium/web-sdk (main entry)', async () => {
 })
 
 await step('2. WASM entrypoint: token address helpers', async () => {
-  const sdk: any = await import('@concordium/web-sdk')
-  const fn = sdk.tokenAddressToBase58 ?? sdk.CIS2?.tokenAddressToBase58
-  if (!fn) return 'helper not found on main entry (skipped, not a failure of WASM load)'
+  const sdk = (await import('@concordium/web-sdk')) as Record<string, unknown>
+  const fn = sdk.tokenAddressToBase58
+  if (typeof fn !== 'function') return 'helper not found on main entry (skipped, not a failure of WASM load)'
   return 'helper present'
 })
 
@@ -43,7 +44,7 @@ await step('3. gRPC-web client (fetch transport) getConsensusStatus', async () =
 
 await step('4. gRPC node client (@grpc/grpc-js) getConsensusStatus', async () => {
   const { ConcordiumGRPCNodeClient, credentials } = await import('@concordium/web-sdk/nodejs')
-  const client = new ConcordiumGRPCNodeClient(TESTNET_HOST, TESTNET_PORT, credentials.createSsl(), { timeout: 15000 } as any)
+  const client = new ConcordiumGRPCNodeClient(TESTNET_HOST, TESTNET_PORT, credentials.createSsl(), { timeout: 15000 })
   const status = await client.getConsensusStatus()
   return `ok, last finalized height ${status.lastFinalizedBlockHeight}`
 })
@@ -55,7 +56,7 @@ await step('5. hosted registry /healthz via plain fetch (no SDK)', async () => {
 
 await step('6. hosted registry /openapi.json via plain fetch', async () => {
   const r = await fetch(`${REGISTRY}/openapi.json`)
-  const j: any = await r.json()
+  const j = (await r.json()) as { paths?: Record<string, unknown> }
   return `HTTP ${r.status}, ${Object.keys(j.paths ?? {}).length} REST paths`
 })
 

@@ -43,6 +43,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // concordium-hackathon branch only: dev-time route to the isolated Node service.
+      '/concordium': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/concordium/, ''),
+      },
     },
   },
 })
