@@ -1,0 +1,14 @@
+{
+  "name": "jarawork-concordium",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Concordium hackathon module. Not part of the live JaraWork build.",
+  "scripts": {
+    "smoke:bun": "bun run smoke/run.ts",
+    "smoke:node": "node --experimental-strip-types smoke/run.ts"
+  },
+  "dependencies": {
+    "@concordium/web-sdk": "^12.0.2",
+    "@grpc/grpc-js": "^1.12.0"
+  }
+}
