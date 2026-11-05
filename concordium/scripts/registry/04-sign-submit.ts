@@ -26,6 +26,7 @@ import {
   type UpdateContractInput,
 } from '@concordium/web-sdk'
 import { ConcordiumGRPCNodeClient, credentials } from '@concordium/web-sdk/nodejs'
+import { checkKeyAgainstAccount } from './keycheck.ts'
 import { config, flagValue, hasFlag, paths, requireEnv, show, writeState } from './lib.ts'
 
 interface Payload {
@@ -75,8 +76,25 @@ if (!hasFlag('--submit')) {
 }
 
 // 2. Sign with the key from the environment and submit.
-const key = requireEnv('CCD_OWNER_PRIVATE_KEY').trim().replace(/^0x/i, '')
-if (!/^[0-9a-fA-F]{64}$/.test(key)) throw new Error('CCD_OWNER_PRIVATE_KEY must be 64 hex characters. (Value not shown.)')
+const key = (process.env.CCD_OWNER_PRIVATE_KEY ?? '').trim().replace(/^0x/i, '')
+if (!/^[0-9a-fA-F]{64}$/.test(key)) {
+  console.error('\nSTOP. CCD_OWNER_PRIVATE_KEY in concordium/.env is empty or not 64 hex characters. Nothing was sent.')
+  console.error(`  Paste the private key of ${p.sender} after CCD_OWNER_PRIVATE_KEY= and save the file.`)
+  process.exit(1)
+}
+
+// Pre-flight: refuse to send anything if the key is not the signing key of the sender account.
+// (A wrong key makes the node answer only "Verification failed", which says nothing useful.)
+const keyCheck = await checkKeyAgainstAccount(client, p.sender, key)
+if (!keyCheck.belongs) {
+  console.error(`\nSTOP. The key in CCD_OWNER_PRIVATE_KEY is not the signing key of ${p.sender}. Nothing was sent.`)
+  console.error(`  public key derived from your key : ${keyCheck.derivedPublicKey}`)
+  console.error(`  public key(s) the chain holds     : ${keyCheck.onChainKeys.join(', ')}`)
+  if (keyCheck.pastedValueIsAPublicKey) console.error('  You pasted the PUBLIC key. Export the PRIVATE key instead.')
+  console.error('  In Concordium Wallet for Web, select the account above, then Accounts > Export > Copy account private key.')
+  process.exit(1)
+}
+console.log('\nKey check passed: the key in CCD_OWNER_PRIVATE_KEY belongs to the sender account.')
 
 const maxEnergy = Math.max(p.suggested_energy, Math.ceil(usedEnergy * 1.5))
 const nonce = await client.getNextAccountNonce(sender)

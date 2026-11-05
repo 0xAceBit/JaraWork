@@ -55,6 +55,8 @@ show('SUMMARY', {
 console.log(
   card.match === true
     ? '\nCard hash matches the chain. If badgeValid is false and the issues mention the badge, that is expected until steps 6 and 7 are done.'
-    : '\nThe card hash does NOT match. Do not continue until this is fixed (step 2 shows what the server serves).',
+    : card.match === null
+      ? '\nThe registry could NOT FETCH the card (match is null, not false). On Render free tier this usually means the service was asleep: open the card URL once in a browser, then rerun this script.'
+      : '\nThe card hash does NOT match the chain (match is false). Do not continue until this is fixed (step 2 shows what the server serves).',
 )
 process.exit(card.match === true ? 0 : 1)
