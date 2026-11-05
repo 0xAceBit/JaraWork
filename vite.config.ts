@@ -44,10 +44,10 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       // concordium-hackathon branch only: dev-time route to the isolated Node service.
-      '/concordium': {
+      '/ccd-svc': {
         target: 'http://localhost:3002',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/concordium/, ''),
+        rewrite: (path) => path.replace(/^\/ccd-svc/, ''),
       },
     },
   },

@@ -50,8 +50,8 @@ function mount(): void {
   async function refresh(): Promise<void> {
     try {
       const [health, chain] = await Promise.all([
-        getJson<Health>('/concordium/health'),
-        getJson<Chain>('/concordium/chain'),
+        getJson<Health>('/ccd-svc/health'),
+        getJson<Chain>('/ccd-svc/chain'),
       ])
       const up = health.ok && chain.ok
       dot.style.background = up ? '#2fbf71' : '#e5a03a'
