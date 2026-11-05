@@ -31,6 +31,12 @@ async function handle(req, res) {
   const path = (req.url ?? '/').split('?')[0]
   try {
     if (path === '/') {
+      // Browsers get the friendly page; API clients (no text/html in Accept) keep the JSON description.
+      if ((req.headers.accept ?? '').includes('text/html')) {
+        const page = await readFile(new URL('./public/index.html', import.meta.url))
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', 'content-length': page.length })
+        return res.end(page)
+      }
       return json(res, 200, {
         service: 'jarawork-concordium',
         description: 'Isolated Concordium hackathon service for JaraWork. Testnet only.',

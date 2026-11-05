@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JaraWork Proof Validator | Concordium testnet</title>
+  <meta name="description" content="Checks delivery proofs for JaraWork escrow orders. Concordium testnet demo." />
+  <style>
+    :root { color-scheme: light; --amber: #e8700a; --ink: #2a1a0c; --muted: #7a6650; --card: #fff; --bg: #fff7ee; --line: #f1dcc3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 20px 56px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .logo { width: 42px; height: 42px; border-radius: 12px; background: #2a1a0c; color: var(--amber); display: grid; place-items: center; font-weight: 800; font-size: 22px; }
+    .brand b { display: block; font-size: 17px; }
+    .brand span { font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+    h1 { font-size: 30px; line-height: 1.2; margin: 0 0 10px; }
+    h1 em { font-style: normal; color: var(--amber); }
+    p.lead { color: var(--muted); margin: 0 0 24px; font-size: 16px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+    .card h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    ul { margin: 0; padding-left: 18px; } li { margin: 4px 0; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+    .row:last-child { border-bottom: 0; }
+    .row span:first-child { color: var(--muted); }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #c9b9a4; margin-right: 8px; }
+    .dot.ok { background: #1fa45a; } .dot.bad { background: #d33; }
+    a { color: var(--amber); font-weight: 600; text-decoration: none; } a:hover { text-decoration: underline; }
+    .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: #fde7cf; color: #a24f06; margin-right: 6px; }
+    footer { margin-top: 26px; font-size: 12.5px; color: var(--muted); }
+    code { background: #fbeedd; padding: 1px 6px; border-radius: 6px; font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <div class="logo">J</div>
+      <div><b>JaraWork</b><span>Proof Validator</span></div>
+    </div>
+
+    <span class="pill">Concordium testnet</span><span class="pill">Hackathon demo</span>
+    <h1 style="margin-top:14px">Delivery proof checks for <em>escrow orders</em></h1>
+    <p class="lead">This service checks the proof a worker submits for a JaraWork order (a tracking number, a link or an IPFS hash) and answers pass or fail with a short reason.</p>
+
+    <section class="card">
+      <h2>What it checks</h2>
+      <ul>
+        <li>Links: secure, public web addresses only</li>
+        <li>IPFS hashes: well-formed content identifiers</li>
+        <li>Tracking numbers: format only. It does not confirm delivery</li>
+        <li>Free text: never auto-approved</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Live status</h2>
+      <div class="row"><span>Service</span><span><i class="dot" id="d-health"></i><span id="v-health">checking...</span></span></div>
+      <div class="row"><span>Network</span><span id="v-net">-</span></div>
+      <div class="row"><span>Latest testnet block</span><span id="v-block">checking...</span></div>
+    </section>
+
+    <section class="card">
+      <h2>For developers</h2>
+      <ul>
+        <li><a href="/.well-known/agent-card.json">Agent Card</a> (the file the registry reads)</li>
+        <li><a href="/health">/health</a> and <a href="/chain">/chain</a></li>
+        <li><a href="https://github.com/0xAceBit/JaraWork/tree/concordium-hackathon/concordium">Source code</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      Testnet only. This is a work-in-progress demo, not a production service. Operated by Ace Corporation.
+      The main JaraWork app lives at <a href="https://jarawork.online">jarawork.online</a>.
+    </footer>
+  </main>
+
+  <script>
+    (async function () {
+      var set = function (id, text) { document.getElementById(id).textContent = text; };
+      try {
+        var h = await (await fetch('/health')).json();
+        document.getElementById('d-health').className = 'dot ok';
+        set('v-health', 'Running');
+        set('v-net', String(h.network || 'testnet'));
+      } catch (e) {
+        document.getElementById('d-health').className = 'dot bad';
+        set('v-health', 'Unreachable');
+      }
+      try {
+        var c = await (await fetch('/chain')).json();
+        set('v-block', String(c.lastFinalizedBlockHeight || c.height || c.block || 'unknown'));
+      } catch (e) {
+        set('v-block', 'unavailable');
+      }
+    })();
+  </script>
+</body>
+</html>
