@@ -2,6 +2,7 @@
  * Concordium hackathon service skeleton. Runs on Node, not Bun (see README).
  * Isolated from the live JaraWork app. Port 3002 locally.
  */
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { ConcordiumGRPCWebClient } from '@concordium/web-sdk'
 
@@ -34,8 +35,19 @@ async function handle(req, res) {
         service: 'jarawork-concordium',
         description: 'Isolated Concordium hackathon service for JaraWork. Testnet only.',
         network: NETWORK,
-        routes: ['/health', '/chain'],
+        routes: ['/health', '/chain', '/.well-known/agent-card.json'],
       })
+    }
+    if (path === '/.well-known/agent-card.json') {
+      // Serve the file's raw bytes untouched: the on-chain hash is over these exact bytes.
+      const bytes = await readFile(new URL('./public/agent-card.json', import.meta.url))
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': bytes.length,
+        'cache-control': 'no-store',
+        'access-control-allow-origin': '*',
+      })
+      return res.end(bytes)
     }
     if (path === '/health') {
       return json(res, 200, {
