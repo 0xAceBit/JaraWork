@@ -101,3 +101,9 @@ node scripts/registry/09-resolve-payee.ts [TOKEN_ADDRESS] [--card-claim ACCOUNT]
 node scripts/registry/08-set-agent-wallet.ts [--new-wallet ADDR] [--format raw|wallet]  # then 04-sign-submit.ts --payload .data/set-agent-wallet-payload.json
 npm test                                         # offline tests; add LIVE_REGISTRY=1 for the live ones
 ```
+
+## Keeping the free Render service awake
+
+Render's free tier spins a service down after 15 minutes without traffic, and a cold start takes about a minute. The registry's card check does not wait that long. Use an external monitor (for example UptimeRobot, 5 minute interval) on `/health`.
+
+Render gives each workspace 750 free instance hours per month, shared by all free web services. One service awake all month uses about 720 to 744 of them, so keeping two free services awake exhausts the budget and Render suspends all free services until the next month. Check Billing > Monthly Included Usage in the Render dashboard before enabling it, or move this service to a paid instance.
