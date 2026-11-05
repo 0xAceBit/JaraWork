@@ -61,7 +61,7 @@ Isolated hackathon service for the Concordium Trusted Agents hackathon. Testnet 
 - Location: `concordium/` (own `package.json`, own deploy). Runtime: Node 22+.
 - Public service: https://jarawork-agent.onrender.com (Render, branch `concordium-hackathon`, root directory `concordium`). Routes: `/`, `/health`, `/chain`.
 - Validator core: `concordium/src/validator/` (`validateDeliveryProof`: URL, IPFS CID, tracking number; pass/fail with reason). Tests: `concordium/test/`.
-- Session log and decisions: `concordium/trajectory/`.
+- Session log and decisions: `concordium/trajectory/`. Design and plan: `concordium/docs/`.
 - Dev preview: `/ccd-svc` proxy in `vite.config.ts` and a dev-only status badge (`concordium/ui/devBadge.ts`).
 - Rules: no keys in the repo, separate env from the live app, never merge to `main` before testing.
 

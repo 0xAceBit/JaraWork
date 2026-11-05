@@ -62,3 +62,13 @@ Keep this separate from the live JaraWork service.
 - Nothing in `src/`, `server/`, `contracts/` or the root `Dockerfile` carries Concordium logic.
 - Separate env vars and keys from the live app. Never reuse the live Circle credentials.
 - Session history and decisions are logged in `trajectory/`.
+
+## Documents
+
+- `docs/integration-map.md`: what Concordium's docs and live services confirm, what is unverified, and the riskiest assumptions.
+- `docs/01-validator-spec.md`: `validate_delivery_proof` request, response, codes and checks.
+- `docs/02-buyer-flow.md`: the buyer's decision flow before release, and the stub order store.
+- `docs/03-bun-to-node-port.md`: what a port would take, and why we do not port.
+- `docs/04-plan.md`: day-by-day plan to Nov 22 and Dec 9.
+- `docs/05-cut-list-and-scope.md`: cut order and scope-creep challenges.
+- `trajectory/`: a log of every working session.
