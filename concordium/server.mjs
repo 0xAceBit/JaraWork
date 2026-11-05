@@ -29,6 +29,14 @@ function json(res, status, body) {
 async function handle(req, res) {
   const path = (req.url ?? '/').split('?')[0]
   try {
+    if (path === '/') {
+      return json(res, 200, {
+        service: 'jarawork-concordium',
+        description: 'Isolated Concordium hackathon service for JaraWork. Testnet only.',
+        network: NETWORK,
+        routes: ['/health', '/chain'],
+      })
+    }
     if (path === '/health') {
       return json(res, 200, {
         ok: true,
@@ -57,3 +65,8 @@ const server = createServer((req, res) => {
 })
 
 server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
+
+// Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.
+process.on('SIGTERM', () => {
+  server.close(() => process.exit(0))
+})

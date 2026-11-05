@@ -34,6 +34,23 @@ Run `node server.mjs` in this folder (port 3002). In the Arc Studio sandbox, the
 
 The proxy entry in `vite.config.ts` is dev-only (`vite build` ignores it) and exists on this branch only.
 
+## Deploying as its own Render service
+
+Separate from the live JaraWork service. Never point the live service at this branch.
+
+| Setting | Value |
+| --- | --- |
+| Repository | `0xAceBit/JaraWork` |
+| Branch | `concordium-hackathon` (never `main`) |
+| Root Directory | `concordium` |
+| Runtime | Node |
+| Build Command | `npm install` |
+| Start Command | `node server.mjs` |
+| Health Check Path | `/health` |
+| Environment | `NODE_VERSION=22` |
+
+Dependencies are pinned to the exact versions tested. Optional env vars: `CCD_NETWORK` (label only, default `testnet`), `CCD_GRPC_HOST` and `CCD_GRPC_PORT` (default `grpc.testnet.concordium.com:20000`). No secrets are needed yet.
+
 ## Decision
 
 - Run SDK code (signing, x402 client, transaction submission) in a Node service.

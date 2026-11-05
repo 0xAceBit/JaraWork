@@ -5,8 +5,8 @@
     "": {
       "name": "jarawork-concordium",
       "dependencies": {
-        "@concordium/web-sdk": "^12.0.2",
-        "@grpc/grpc-js": "^1.12.0",
+        "@concordium/web-sdk": "12.0.2",
+        "@grpc/grpc-js": "1.14.7",
       },
     },
   },
