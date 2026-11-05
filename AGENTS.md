@@ -53,3 +53,19 @@ bun install
 bun run dev       # frontend on :5173
 bun run agent     # autonomous agent backend on :3001
 ```
+
+## Concordium module (branch `concordium-hackathon` only)
+
+Isolated hackathon service for the Concordium Trusted Agents hackathon. Testnet only. Not part of the live app.
+
+- Location: `concordium/` (own `package.json`, own deploy). Runtime: Node 22+.
+- Public service: https://jarawork-agent.onrender.com (Render, branch `concordium-hackathon`, root directory `concordium`). Routes: `/`, `/health`, `/chain`.
+- Validator core: `concordium/src/validator/` (`validateDeliveryProof`: URL, IPFS CID, tracking number; pass/fail with reason). Tests: `concordium/test/`.
+- Session log and decisions: `concordium/trajectory/`.
+- Dev preview: `/ccd-svc` proxy in `vite.config.ts` and a dev-only status badge (`concordium/ui/devBadge.ts`).
+- Rules: no keys in the repo, separate env from the live app, never merge to `main` before testing.
+
+```bash
+cd concordium && npm install && npm test   # validator tests
+cd concordium && npm start                 # service on :3002
+```

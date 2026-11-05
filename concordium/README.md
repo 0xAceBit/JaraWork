@@ -1,46 +1,53 @@
-# JaraWork x Concordium (hackathon module)
+# JaraWork Proof Validator (Concordium hackathon module)
 
-Isolated module on the `concordium-hackathon` branch. It is not part of the live JaraWork build and must not be merged to `main` until it has been tested.
+A validator service for JaraWork delivery proofs, built for the Concordium Trusted Agents hackathon. Testnet only.
 
 Built with [Arc Studio](https://studio.arc.io)
 
-## Isolation rules
+This module lives on the `concordium-hackathon` branch and is not part of the live JaraWork app. Do not merge it to `main` until it has been tested.
 
-- Own `package.json` and lockfile. Never add Concordium dependencies to the root `package.json`.
-- Nothing in `src/`, `server/`, `contracts/` or the root `Dockerfile` is changed on this branch.
-- Separate env vars and keys from the live app. Never reuse `CIRCLE_MAINNET_*` credentials here.
-- Deploy as its own service, not the live one.
+## What it does
 
-## Day-one compatibility results (@concordium/web-sdk 12.0.2)
+`validate_delivery_proof` takes the proof a worker submits and returns pass or fail with a reason. It understands three kinds of proof:
 
-Run with `bun run smoke:bun` or `node smoke/run.ts` from this folder. Read-only, no keys.
+- **URLs:** well-formed `https` links on public domains. Local, internal and IP-address links are rejected.
+- **IPFS content IDs:** CIDv0 and CIDv1 (sha2-256), bare, as `ipfs://`, or inside a gateway link.
+- **Tracking numbers:** UPU postal numbers (check digit verified), UPS-style numbers, and common digit-only carrier formats.
 
-| Check | Node 24 | Bun 1.3.14 | Bun 1.4.4 |
-| --- | --- | --- | --- |
-| Import SDK main entry | pass | fail | fail |
-| WASM token helpers | pass | fail | fail |
-| gRPC-web client, testnet | pass | fail | fail |
-| gRPC node client (grpc-js), testnet | pass | fail | fail |
-| Hosted registry via plain fetch | pass | pass | pass |
+Current limits: these are structure checks. They do not confirm that a link loads, that IPFS content exists, or that a parcel was delivered. Those checks are planned next.
 
-Bun fails at module load with `Exported binding name 'Serializable' is not found` (and `'Header'` for the node client). The SDK works on Node.
+## Tech stack
 
-## Dev preview
+Node.js 22 or later, plain ES modules and TypeScript run directly by Node, `@concordium/web-sdk` for Concordium access.
 
-Run `node server.mjs` in this folder (port 3002). In the Arc Studio sandbox, the branch-only Vite proxy exposes it on the preview host:
+## Development
 
-- `/ccd-svc/health` returns service and runtime info.
-- `/ccd-svc/chain` makes a live Concordium testnet call through the SDK.
+Prerequisite: Node.js 22 or later.
 
-The proxy entry in `vite.config.ts` is dev-only (`vite build` ignores it) and exists on this branch only.
+```bash
+cd concordium
+npm install
+npm start        # service on :3002, routes /health and /chain
+npm test         # validator unit tests
+npm run smoke    # Concordium SDK check against testnet (read only)
+```
+
+Environment variables (all optional, no secrets needed yet):
+
+- `PORT` or `CONCORDIUM_PORT`: port to listen on (default 3002).
+- `CCD_NETWORK`: label shown by the service (default `testnet`).
+- `CCD_GRPC_HOST`, `CCD_GRPC_PORT`: Concordium node to read from (default `grpc.testnet.concordium.com`, `20000`).
+
+## Dev preview in Arc Studio
+
+The branch adds a dev-only proxy route `/ccd-svc` in `vite.config.ts` and a small status badge in the preview panel. Neither ships in a production build.
 
 ## Deploying as its own Render service
 
-Separate from the live JaraWork service. Never point the live service at this branch.
+Keep this separate from the live JaraWork service.
 
 | Setting | Value |
 | --- | --- |
-| Repository | `0xAceBit/JaraWork` |
 | Branch | `concordium-hackathon` (never `main`) |
 | Root Directory | `concordium` |
 | Runtime | Node |
@@ -49,10 +56,9 @@ Separate from the live JaraWork service. Never point the live service at this br
 | Health Check Path | `/health` |
 | Environment | `NODE_VERSION=22` |
 
-Dependencies are pinned to the exact versions tested. Optional env vars: `CCD_NETWORK` (label only, default `testnet`), `CCD_GRPC_HOST` and `CCD_GRPC_PORT` (default `grpc.testnet.concordium.com:20000`). No secrets are needed yet.
+## Isolation rules
 
-## Decision
-
-- Run SDK code (signing, x402 client, transaction submission) in a Node service.
-- The Bun escrow agent talks to the registry with plain `fetch` against the hosted REST/MCP service, with no SDK.
-- Do not import `@concordium/web-sdk` from any Bun process.
+- Own `package.json` and lockfile. Do not add Concordium dependencies to the root `package.json`.
+- Nothing in `src/`, `server/`, `contracts/` or the root `Dockerfile` carries Concordium logic.
+- Separate env vars and keys from the live app. Never reuse the live Circle credentials.
+- Session history and decisions are logged in `trajectory/`.

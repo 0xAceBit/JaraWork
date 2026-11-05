@@ -9,8 +9,8 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "smoke:bun": "bun run smoke/run.ts",
-    "smoke:node": "node smoke/run.ts"
+    "test": "node --test test/validator.test.ts",
+    "smoke": "node smoke/run.ts"
   },
   "dependencies": {
     "@concordium/web-sdk": "12.0.2",
