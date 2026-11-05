@@ -8,8 +8,8 @@ Written 2026-11-05. Assumptions to confirm: roughly 2 to 3 focused hours on buil
 
 | Date | Build | You | Exit test |
 | --- | --- | --- | --- |
-| Fri Nov 6 | Sign off the specs. No code | Create two new testnet accounts (payer, sponsor). Request faucet CCD for each (once per account). Send the public addresses. Send the workshop questions. Ask what the Nov 22 checkpoint and submission need | `account-info` shows CCD on payer and sponsor |
-| Sat Nov 7 | Signing spike: registry payload, sign with the SDK, submit, get a token id. Move a few CCD from payer to the owner account | Put the owner testnet key in `.env` as `CCD_OWNER_PRIVATE_KEY` | `agent_of(token)` returns our agent |
+| Fri Nov 6 | Sign off the specs. No code | Create ONE more testnet account in the same wallet (the payer) and send it some CCD from `47rT…`. Send the public address. Send the workshop questions. Ask what the Nov 22 checkpoint and submission need | `account-info` shows CCD on `47rT…` (done: 20,000) and on the payer |
+| Sat Nov 7 | Signing spike: registry payload, sign with the SDK, submit, get a token id | Put the owner testnet key in `.env` as `CCD_OWNER_PRIVATE_KEY` | `agent_of(token)` returns our agent |
 | Sun Nov 8 | Validator v2: repo envelope, `text` kind, response schema, codes | none | Tests green on Node 22 and 24 |
 | Mon Nov 9 | URL reachability with the SSRF guard and redirect re-checks | none | Fake-server tests incl. redirect to a private IP pass |
 | Tue Nov 10 | IPFS retrievability, simulated carrier fixtures, required-checks logic, demo flag | none | One test per row of the spec tables |
@@ -55,7 +55,7 @@ Buffer days: Nov 14, Nov 28, Nov 29, Dec 5, Dec 7, Dec 9.
 
 ## Things that can break the schedule outright
 
-- No testnet CCD. Your wallet `47rT…` has 0 CCD and a transaction count of 1, so its one-time faucet request may already be spent. Use fresh accounts for the faucet and send CCD from them to the owner.
+- Account roles. `47rT…` now holds 20,000 testnet CCD. It can be owner, payee and sponsor at once, because the x402 source rejects only "sponsor is the sender" and deliberately allows "sponsor is the recipient". The payer must be a different account. If a second account cannot be created, the paid flow cannot run, so this is the first thing to settle.
 - Registration signing not working by Nov 8. Fallback is the registry web app with a browser wallet, if it supports testnet (unverified, ask the workshop).
 - No stablecoin on testnet. Default plan is native CCD, so this does not block us.
 - Render free tier sleeping while the card or MCP endpoint is checked. Decide on Nov 12.
