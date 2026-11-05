@@ -93,3 +93,11 @@ node scripts/registry/05-verify.ts
 ```
 
 The signing key lives only in `concordium/.env` (git-ignored). See `.env.example`.
+
+### Payee and agentWallet
+
+```bash
+node scripts/registry/09-resolve-payee.ts [TOKEN_ADDRESS] [--card-claim ACCOUNT]  # who may be paid, read from chain
+node scripts/registry/08-set-agent-wallet.ts [--new-wallet ADDR] [--format raw|wallet]  # then 04-sign-submit.ts --payload .data/set-agent-wallet-payload.json
+npm test                                         # offline tests; add LIVE_REGISTRY=1 for the live ones
+```
