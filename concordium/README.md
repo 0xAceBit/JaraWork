@@ -25,6 +25,15 @@ Run with `bun run smoke:bun` or `node smoke/run.ts` from this folder. Read-only,
 
 Bun fails at module load with `Exported binding name 'Serializable' is not found` (and `'Header'` for the node client). The SDK works on Node.
 
+## Dev preview
+
+Run `node server.mjs` in this folder (port 3002). In the Arc Studio sandbox, the branch-only Vite proxy exposes it on the preview host:
+
+- `/concordium/health` returns service and runtime info.
+- `/concordium/chain` makes a live Concordium testnet call through the SDK.
+
+The proxy entry in `vite.config.ts` is dev-only (`vite build` ignores it) and exists on this branch only.
+
 ## Decision
 
 - Run SDK code (signing, x402 client, transaction submission) in a Node service.

@@ -14,6 +14,11 @@ import './index.css'
 
 const queryClient = new QueryClient()
 
+// concordium-hackathon branch only: dev-time status badge for the isolated Node service.
+if (import.meta.env.DEV) {
+  void import('../concordium/ui/devBadge')
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <WagmiProvider config={config}>
