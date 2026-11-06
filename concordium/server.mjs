@@ -2,12 +2,19 @@
  * Concordium hackathon service skeleton. Runs on Node, not Bun (see README).
  * Isolated from the live JaraWork app. Port 3002 locally.
  */
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import { ConcordiumGRPCWebClient } from '@concordium/web-sdk'
 import { handleMcpRequest } from './src/service/mcpHttp.ts'
 import { createStubProbes } from './src/service/probes.ts'
+import { loadPaymentsConfig } from './src/payments/config.ts'
+import { createPaymentContext } from './src/payments/paymentContext.ts'
+
+// Local development only: on Render there is no .env file and the host provides the environment.
+const localEnv = new URL('./.env', import.meta.url)
+if (existsSync(localEnv)) process.loadEnvFile(localEnv)
 
 const PORT = Number(process.env.PORT ?? process.env.CONCORDIUM_PORT ?? 3002)
 const NODE_HOST = process.env.CCD_GRPC_HOST ?? 'grpc.testnet.concordium.com'
@@ -29,12 +36,13 @@ function json(res, status, body) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
- * @param {import('./src/service/probes.ts').Probes} probes
+ * @param {{ probes: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown> }} ctx
  */
-async function handle(req, res, probes) {
+async function handle(req, res, ctx) {
   const path = (req.url ?? '/').split('?')[0]
   try {
-    if (path === '/mcp') return await handleMcpRequest(req, res, probes)
+    if (path === '/mcp') return await handleMcpRequest(req, res, ctx.probes, ctx.wrap)
+    if (path === '/x402/status') return json(res, 200, ctx.paymentStatus ? ctx.paymentStatus() : { enabled: false })
     if (path === '/') {
       // Browsers get the friendly page; API clients (no text/html in Accept) keep the JSON description.
       if ((req.headers.accept ?? '').includes('text/html')) {
@@ -85,18 +93,26 @@ async function handle(req, res, probes) {
 
 /**
  * Builds the HTTP server without starting it, so tests can run it on a random port.
- * @param {{ probes?: import('./src/service/probes.ts').Probes }} [options]
+ * @param {{ probes?: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown> }} [options]
  */
 export function createAppServer(options = {}) {
-  const probes = options.probes ?? createStubProbes()
+  const ctx = { probes: options.probes ?? createStubProbes(), wrap: options.wrap, paymentStatus: options.paymentStatus }
   return createServer((req, res) => {
-    void handle(req, res, probes)
+    void handle(req, res, ctx)
   })
 }
 
 // Start listening only when run directly (`node server.mjs`), not when imported by a test.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = createAppServer()
+  // Paid mode starts only when X402_ENABLED=true; otherwise the tool stays free, as before.
+  const paymentsConfig = loadPaymentsConfig()
+  let payments
+  if (paymentsConfig) {
+    const { ConcordiumGRPCNodeClient, credentials } = await import('@concordium/web-sdk/nodejs')
+    const chain = new ConcordiumGRPCNodeClient(paymentsConfig.grpcHost, paymentsConfig.grpcPort, credentials.createSsl(), { timeout: 20_000 })
+    payments = await createPaymentContext(paymentsConfig, chain)
+  }
+  const server = createAppServer(payments ? { wrap: payments.wrap, paymentStatus: payments.status } : {})
   server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
 
   // Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.

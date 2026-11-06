@@ -42,7 +42,19 @@ const DESCRIPTION =
   'IMPORTANT: in this testnet build the carrier, link and IPFS lookups are SIMULATED by stubs. When "simulated" ' +
   'is true, a pass is not real-world evidence of delivery.'
 
-export function createValidatorMcpServer(probes: Probes = createStubProbes()): McpServer {
+/** The tool handler's shape, so paid mode can wrap it without changing the free behaviour. */
+export type ToolHandler = (
+  args: { proof: string; orderRef?: string | undefined },
+  extra: unknown,
+) => Promise<{
+  content: { type: 'text'; text: string }[]
+  structuredContent: Record<string, unknown>
+  isError?: boolean
+  _meta?: Record<string, unknown>
+}>
+export type ToolWrap = (handler: ToolHandler) => ToolHandler
+
+export function createValidatorMcpServer(probes: Probes = createStubProbes(), wrap: ToolWrap = (handler) => handler): McpServer {
   const server = new McpServer({ name: VALIDATOR_INFO.name, version: VALIDATOR_INFO.version })
 
   server.registerTool(
@@ -57,10 +69,10 @@ export function createValidatorMcpServer(probes: Probes = createStubProbes()): M
       outputSchema: VERDICT_SHAPE,
       annotations: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
     },
-    async (args) => {
+    wrap(async (args) => {
       const result = await validateDeliveryProof(args, probes)
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: { ...result } }
-    },
+    }),
   )
 
   return server

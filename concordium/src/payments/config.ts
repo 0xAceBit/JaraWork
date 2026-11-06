@@ -41,7 +41,7 @@ export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig | nul
   }
   const estimatedSponsorFeeMicro = micro(env, 'ESTIMATED_SPONSOR_FEE_MICRO', 4_000_000n)
   return {
-    network: CONCORDIUM_TESTNET_CAIP2 as Network,
+    network: CONCORDIUM_TESTNET_CAIP2,
     registryTokenAddress: env.REGISTRY_TOKEN_ADDRESS ?? 'JyP9YR6Wk3YPaGx3e8zyu',
     facilitatorAddress: env.CCD_FACILITATOR_ADDRESS ?? '3EZWRpdzPzi8WfsGRsiupiQEGZ6DjouZsANczD1uKEpkFL7qwc',
     facilitatorPrivateKey: key,

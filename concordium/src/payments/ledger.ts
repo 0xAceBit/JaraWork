@@ -60,6 +60,8 @@ export interface LedgerLimits {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+/** Verification plus finalization is well under this; beyond it a 'verified' payment is abandoned. */
+const STALE_MS = 3 * 60 * 1000
 
 export class PaymentLedger {
   private readonly records: PaymentRecord[] = []
@@ -105,7 +107,12 @@ export class PaymentLedger {
     if (this.payloads.has(input.payloadHash)) {
       return { kind: 'rejected', code: 'PAYLOAD_REPLAYED', reason: 'This signed payment was already presented. Create a new payment.' }
     }
-    const existing = this.latestById.get(input.requestId)
+    let existing = this.latestById.get(input.requestId)
+    if (existing?.status === 'verified' && this.now().getTime() - Date.parse(existing.updatedAt) > STALE_MS) {
+      // An in-flight payment that never finished (crash, timeout) must not block the id forever.
+      this.save({ ...existing, status: 'failed', failure: 'abandoned: no settlement within the time limit', updatedAt: this.now().toISOString() })
+      existing = undefined
+    }
     if (existing && existing.status !== 'failed') {
       if (existing.proofSha256 !== input.proofSha256) {
         return { kind: 'rejected', code: 'ID_CONFLICT', reason: 'This request id was already used for a different proof.' }
@@ -155,6 +162,10 @@ export class PaymentLedger {
     const next = { ...current, ...patch, updatedAt: this.now().toISOString() }
     this.save(next)
     return next
+  }
+
+  find(requestId: string): PaymentRecord | undefined {
+    return this.latestById.get(requestId)
   }
 
   all(): PaymentRecord[] {

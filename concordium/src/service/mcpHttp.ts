@@ -7,6 +7,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { createValidatorMcpServer } from './mcp.ts'
+import type { ToolWrap } from './mcp.ts'
 import { createStubProbes } from './probes.ts'
 import type { Probes } from './probes.ts'
 
@@ -34,6 +35,7 @@ export async function handleMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
   probes: Probes = createStubProbes(),
+  wrap?: ToolWrap,
 ): Promise<void> {
   if (req.method !== 'POST') {
     res.setHeader('allow', 'POST')
@@ -48,7 +50,7 @@ export async function handleMcpRequest(
     return rpcError(res, 400, -32700, 'Parse error: the body is not valid JSON.')
   }
 
-  const server = createValidatorMcpServer(probes)
+  const server = createValidatorMcpServer(probes, wrap)
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
   res.on('close', () => {
     void transport.close()
