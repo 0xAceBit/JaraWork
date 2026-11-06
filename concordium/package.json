@@ -18,6 +18,9 @@
     "@concordium/web-sdk": "12.0.2",
     "@grpc/grpc-js": "1.14.7",
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@x402/concordium": "2.30.0",
+    "@x402/core": "2.30.0",
+    "@x402/mcp": "2.30.0",
     "zod": "4.6.6"
   },
   "devDependencies": {

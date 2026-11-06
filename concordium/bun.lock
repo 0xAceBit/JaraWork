@@ -8,6 +8,9 @@
         "@concordium/web-sdk": "12.0.2",
         "@grpc/grpc-js": "1.14.7",
         "@modelcontextprotocol/sdk": "1.32.2",
+        "@x402/concordium": "2.30.0",
+        "@x402/core": "2.30.0",
+        "@x402/mcp": "2.30.0",
         "zod": "4.6.6",
       },
       "devDependencies": {
@@ -108,6 +111,12 @@
     "@typescript/typescript-win32-arm64": ["@typescript/typescript-win32-arm64@7.0.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-Gyl1Vy6OsWesLzmq+EP0Fb7b4Nid5232AvcA2SFcdYreldpNtYFFofPjnt62y9hQy7VTaZp65ICJjuAQRaVcIQ=="],
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
+
+    "@x402/concordium": ["@x402/concordium@2.30.0", "", { "dependencies": { "@concordium/web-sdk": "^12.0.0", "@x402/core": "~2.30.0" } }, "sha512-FbDFSztoCf3X5eYy9UiEMVVt0PhgAhyhqXhBMiFeRKPM5Ya4EQE7gRdzBYSO70W+WHgUVVOrvAc6Wb749Wiacw=="],
+
+    "@x402/core": ["@x402/core@2.30.0", "", { "dependencies": { "zod": "^4.6.6" } }, "sha512-gvMxCum2QlNI6jI/3NL1jdrmOgtX9sWEWxSIOmeI67/5ndOJvYOtP7JZLSO8o8af+O+A+Vhhjza1NCda0yVppg=="],
+
+    "@x402/mcp": ["@x402/mcp@2.30.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.32.0", "@x402/core": "~2.30.0", "zod": "^4.6.6" } }, "sha512-4aW3iKSFbTJ6X5b9/u1MyoNGDY898jcEnKcR5hzDnkd74tpCBGPTMwjbVZBnsKsmju89BzI/BXWdMgdorpKvrw=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
