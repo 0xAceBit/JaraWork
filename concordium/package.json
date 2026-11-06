@@ -9,14 +9,16 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test/validator.test.ts test/resolvePayee.test.ts test/agentWalletMessage.test.ts",
+    "test": "node --test test/validator.test.ts test/resolvePayee.test.ts test/agentWalletMessage.test.ts test/service.verdicts.test.ts test/service.tamper.test.ts test/service.mcp.test.ts",
     "smoke": "node smoke/run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "block": "node scripts/latest-block.ts"
   },
   "dependencies": {
     "@concordium/web-sdk": "12.0.2",
-    "@grpc/grpc-js": "1.14.7"
+    "@grpc/grpc-js": "1.14.7",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

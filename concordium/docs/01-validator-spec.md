@@ -1,6 +1,7 @@
 # 01. validate_delivery_proof: request, response, checks
 
-Status: design only, nothing here is implemented yet. Written 2026-11-05.
+> Status: implemented in `src/service/` (prompt 5). The response field is `verdict` (`"pass"` or `"fail"`), not a boolean `pass`. It also carries `evidenceHash` (SHA-256 of the canonical evidence examined) and `simulated`. The carrier, link and IPFS lookups are behind interfaces and are stubs, so every pass is labelled simulated.
+
 
 ## Principles
 
@@ -30,7 +31,7 @@ Status: design only, nothing here is implemented yet. Written 2026-11-05.
 ```json
 {
   "schemaVersion": "1",
-  "pass": true,
+  "verdict": "pass",
   "kind": "url",
   "code": "OK",
   "reason": "HTTPS link is reachable (HTTP 200).",
@@ -48,7 +49,7 @@ Status: design only, nothing here is implemented yet. Written 2026-11-05.
 
 Rules for every response:
 
-- `pass` is true only when every required check for the kind is `ok`. A check with `"simulated": true` does not count unless the service runs in demo mode.
+- `verdict` is `"pass"` only when every required check for the kind is `ok` (otherwise `"fail"`). A check with `"simulated": true` is labelled and the top-level `simulated` flag is set; the buyer decides whether a simulated pass counts (see 02).
 - `reason` is at most 200 characters and built from fixed templates. It never contains the raw proof or anything fetched.
 - `retryable` is true only for transient network failures.
 - `proofSha256` lets the buyer log an audit trail without storing the proof.

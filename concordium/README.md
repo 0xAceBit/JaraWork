@@ -107,3 +107,19 @@ npm test                                         # offline tests; add LIVE_REGIS
 Render's free tier spins a service down after 15 minutes without traffic, and a cold start takes about a minute. The registry's card check does not wait that long. Use an external monitor (for example UptimeRobot, 5 minute interval) on `/health`.
 
 Render gives each workspace 750 free instance hours per month, shared by all free web services. One service awake all month uses about 720 to 744 of them, so keeping two free services awake exhausts the budget and Render suspends all free services until the next month. Check Billing > Monthly Included Usage in the Render dashboard before enabling it, or move this service to a paid instance.
+
+## The MCP tool
+
+`POST /mcp` speaks MCP over Streamable HTTP (stateless, JSON responses) and exposes one tool, `validate_delivery_proof`. Send `Accept: application/json, text/event-stream`.
+
+- Input: `proof` (the exact deliveryProof string, a JSON object with `type` of `tracking`, `url`, `ipfs` or `text`) and an optional `orderRef`.
+- Output: `verdict` (`pass` or `fail`), `code`, `reason`, `retryable`, `checks`, `evidenceHash`, `proofSha256`, `simulated`.
+- In this testnet build the carrier, link and IPFS lookups are simulated stubs, and every response says so.
+
+Try it:
+
+```bash
+curl -s -X POST http://localhost:3002/mcp \
+  -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_delivery_proof","arguments":{"proof":"{\"type\":\"tracking\",\"value\":\"1Z999AA10123456784\",\"carrier\":\"UPS\",\"note\":\"\"}"}}}'
+```

@@ -4,7 +4,10 @@
  */
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { pathToFileURL } from 'node:url'
 import { ConcordiumGRPCWebClient } from '@concordium/web-sdk'
+import { handleMcpRequest } from './src/service/mcpHttp.ts'
+import { createStubProbes } from './src/service/probes.ts'
 
 const PORT = Number(process.env.PORT ?? process.env.CONCORDIUM_PORT ?? 3002)
 const NODE_HOST = process.env.CCD_GRPC_HOST ?? 'grpc.testnet.concordium.com'
@@ -26,10 +29,12 @@ function json(res, status, body) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
+ * @param {import('./src/service/probes.ts').Probes} probes
  */
-async function handle(req, res) {
+async function handle(req, res, probes) {
   const path = (req.url ?? '/').split('?')[0]
   try {
+    if (path === '/mcp') return await handleMcpRequest(req, res, probes)
     if (path === '/') {
       // Browsers get the friendly page; API clients (no text/html in Accept) keep the JSON description.
       if ((req.headers.accept ?? '').includes('text/html')) {
@@ -41,7 +46,7 @@ async function handle(req, res) {
         service: 'jarawork-concordium',
         description: 'Isolated Concordium hackathon service for JaraWork. Testnet only.',
         network: NETWORK,
-        routes: ['/health', '/chain', '/.well-known/agent-card.json'],
+        routes: ['/health', '/chain', '/mcp', '/.well-known/agent-card.json'],
       })
     }
     if (path === '/.well-known/agent-card.json') {
@@ -72,19 +77,30 @@ async function handle(req, res) {
         lastFinalizedBlockHeight: String(status.lastFinalizedBlockHeight),
       })
     }
-    return json(res, 404, { ok: false, error: 'not found', routes: ['/health', '/chain'] })
+    return json(res, 404, { ok: false, error: 'not found', routes: ['/health', '/chain', '/mcp'] })
   } catch (err) {
     return json(res, 502, { ok: false, error: err instanceof Error ? err.message : String(err) })
   }
 }
 
-const server = createServer((req, res) => {
-  void handle(req, res)
-})
+/**
+ * Builds the HTTP server without starting it, so tests can run it on a random port.
+ * @param {{ probes?: import('./src/service/probes.ts').Probes }} [options]
+ */
+export function createAppServer(options = {}) {
+  const probes = options.probes ?? createStubProbes()
+  return createServer((req, res) => {
+    void handle(req, res, probes)
+  })
+}
 
-server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
+// Start listening only when run directly (`node server.mjs`), not when imported by a test.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const server = createAppServer()
+  server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
 
-// Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.
-process.on('SIGTERM', () => {
-  server.close(() => process.exit(0))
-})
+  // Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.
+  process.on('SIGTERM', () => {
+    server.close(() => process.exit(0))
+  })
+}
