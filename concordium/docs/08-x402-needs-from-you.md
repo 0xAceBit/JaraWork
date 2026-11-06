@@ -35,3 +35,11 @@ Nothing below is built. Each item has a recommendation, so a one-word answer is 
 - Whether the node gRPC client works from Render (we use the web client there today).
 - The real sponsor fee for one transfer.
 - Whether @x402/mcp accepts a Concordium scheme registration (its README only shows EVM).
+
+## Decisions recorded 2026-11-06
+
+- Accounts: payer 3HKu4eSXZBTeCmf6XV51EQ1HuBe3tDNDo1TbDcEBzPgYrRHg1V (sender), payee 47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk (the registry agentWallet), sponsor and facilitator 3EZWRpdzPzi8WfsGRsiupiQEGZ6DjouZsANczD1uKEpkFL7qwc (1,500 CCD on testnet). Three separate accounts, as the spec requires.
+- Asset: native CCD. Surface: the MCP tool call.
+- Flow: build the sponsored flow from the official package first. A second payment option, where the client broadcasts and sends the transaction hash, comes after the first settled sponsored payment. Both would be offered in the same 402 `accepts` list. The how-to page's identity proof is not built because no source specifies it.
+- Request id (F): `pay_` plus the first 32 hex of sha256("<orderRef>:<proofSha256>"), or of the proof hash alone when there is no orderRef. Same id and same proof returns the stored result with no second charge. Same id and a different proof is rejected. Ids are kept for 24 hours.
+- Numbers (G), set from a measured fee, not guessed: price = 1.5 x the measured sponsor fee for one transfer, buyer cap per payment = 2 x price, buyer cap per day = 20 x price, sponsor budget per day = 50 x the measured fee. Testnet fees are large in CCD terms (a contract call cost 22.2 CCD), so these must be measured on the first settled payment.
