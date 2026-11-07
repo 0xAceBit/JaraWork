@@ -123,3 +123,7 @@ curl -s -X POST http://localhost:3002/mcp \
   -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_delivery_proof","arguments":{"proof":"{\"type\":\"tracking\",\"value\":\"1Z999AA10123456784\",\"carrier\":\"UPS\",\"note\":\"\"}"}}}'
 ```
+
+## The buyer
+
+`src/buyer/` is the Node port of the escrow decision. Before paying anything it verifies the validator from the registry (badge, active status, card hash, card endpoint, payee). Only then does it pay over x402, call the tool and decide: release now, flag for review, or fall back to the existing timer. `scripts/buyer-verify-live.ts` runs the verification against the real testnet registry without paying.
