@@ -39,7 +39,7 @@ export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig | nul
   if (!/^[0-9a-fA-F]{64}$/.test(key)) {
     throw new Error('X402_ENABLED is true but the facilitator key is missing or not 64 hex characters (value not shown).')
   }
-  const estimatedSponsorFeeMicro = micro(env, 'ESTIMATED_SPONSOR_FEE_MICRO', 4_000_000n)
+  const estimatedSponsorFeeMicro = micro(env, 'ESTIMATED_SPONSOR_FEE_MICRO', 5_000_000n)
   return {
     network: CONCORDIUM_TESTNET_CAIP2,
     registryTokenAddress: env.REGISTRY_TOKEN_ADDRESS ?? 'JyP9YR6Wk3YPaGx3e8zyu',
@@ -49,8 +49,8 @@ export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig | nul
     grpcPort: Number(env.CCD_GRPC_PORT ?? 20000),
     priceMicro: micro(env, 'PRICE_MICRO_CCD', (estimatedSponsorFeeMicro * 3n) / 2n),
     estimatedSponsorFeeMicro,
-    payerDailyMaxMicro: micro(env, 'PAYER_DAILY_MAX_MICRO', 120_000_000n),
-    sponsorDailyBudgetMicro: micro(env, 'SPONSOR_DAILY_BUDGET_MICRO', 200_000_000n),
+    payerDailyMaxMicro: micro(env, 'PAYER_DAILY_MAX_MICRO', 150_000_000n),
+    sponsorDailyBudgetMicro: micro(env, 'SPONSOR_DAILY_BUDGET_MICRO', 250_000_000n),
     maxTimeoutSeconds: Number(env.X402_MAX_TIMEOUT_SECONDS ?? 60),
     ledgerFile: env.X402_LEDGER_FILE ?? null,
   }

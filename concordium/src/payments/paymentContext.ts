@@ -11,7 +11,7 @@ import { createPaymentWrapper, x402ResourceServer } from '@x402/mcp'
 import { resolvePayee } from '../registry/resolvePayee.ts'
 import { canonicalJson, sha256Hex } from '../service/evidence.ts'
 import type { ToolHandler, ToolWrap } from '../service/mcp.ts'
-import { readBalances, readSummaryCost, reconcile } from './accounting.ts'
+import { readBalances, readSummaryCosts, reconcile } from './accounting.ts'
 import type { Balances } from './accounting.ts'
 import type { PaymentsConfig } from './config.ts'
 import { createFacilitator } from './facilitator.ts'
@@ -31,7 +31,14 @@ export interface PaymentContext {
 
 const defaultLog: PaymentLog = (event, data) => console.log(JSON.stringify({ at: new Date().toISOString(), event, ...data }))
 const payloadHashOf = (p: PaymentPayload): string => sha256Hex(canonicalJson(p.payload))
-const senderOf = (p: PaymentPayload): string => (typeof p.payload.sender === 'string' ? p.payload.sender : '')
+/**
+ * The payer is inside the signed transaction. (The package docs show a top-level `sender` in the payload;
+ * the real client does not send one, so reading it there returned an empty string.)
+ */
+const senderOf = (p: PaymentPayload): string => {
+  const tx = p.payload.signedTransaction as { header?: { sender?: unknown } } | undefined
+  return typeof tx?.header?.sender === 'string' ? tx.header.sender : ''
+}
 
 export async function createPaymentContext(config: PaymentsConfig, chain: ConcordiumGRPCNodeClient, log: PaymentLog = defaultLog): Promise<PaymentContext> {
   const payee = await resolvePayee(config.registryTokenAddress)
@@ -64,6 +71,10 @@ export async function createPaymentContext(config: PaymentsConfig, chain: Concor
     onBeforeExecution: async ({ arguments: args, paymentPayload, paymentRequirements }: { arguments: Record<string, unknown>; paymentPayload: PaymentPayload; paymentRequirements: { amount: string } }): Promise<boolean> => {
       const facts = describeRequest(args)
       const payer = senderOf(paymentPayload)
+      if (payer === '') {
+        log('x402.refused', { why: 'the payer could not be identified from the signed transaction' })
+        return false
+      }
       const payloadHash = payloadHashOf(paymentPayload)
       const outcome = ledger.begin({ ...facts, payer, payTo, amountMicro: BigInt(paymentRequirements.amount), payloadHash })
       if (outcome.kind !== 'new') {
@@ -93,8 +104,11 @@ export async function createPaymentContext(config: PaymentsConfig, chain: Concor
       pending.delete(key)
       const payer = senderOf(paymentPayload)
       const after = await readBalances(chain, [payer, payTo, sponsor])
-      const cost = await readSummaryCost(chain, settlement.transaction).catch(() => null)
-      const accounting = reconcile({ before: entry.before, after, priceMicro: config.priceMicro, payer, payTo, sponsor, summaryCostMicro: cost })
+      const cost = await readSummaryCosts(chain, settlement.transaction).catch((error: unknown) => {
+        log('x402.summary_unreadable', { txHash: settlement.transaction, error: String(error).slice(0, 160) })
+        return null
+      })
+      const accounting = reconcile({ before: entry.before, after, priceMicro: config.priceMicro, payer, payTo, sponsor, summaryCostMicro: cost?.sponsorMicro ?? null, senderCostMicro: cost?.senderMicro ?? null })
       ledger.settled(key, { txHash: settlement.transaction, accounting, result: entry.result ?? null })
       log('x402.settled', { txHash: settlement.transaction, payer, accounting })
     },

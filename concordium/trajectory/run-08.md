@@ -22,3 +22,11 @@ Date: 2026-11-06. Branch: concordium-hackathon. Paid mode is OFF unless X402_ENA
 - No payment has settled yet: waiting for the payer's real key (account 3HKu4...).
 - Fee split between sponsor and buyer in a sponsored transaction is UNVERIFIED until the first settlement; the accounting cross-checks two sources and reports 'unverified' if they disagree.
 - Ledger is a file on Render's ephemeral disk, so it resets on redeploy. A database is the production step.
+
+## Result (2026-11-07): end-to-end test passed, 16 of 16 checks, 0 failures
+- Settled sponsored payments on testnet, for example 950b44e8616fb962... and 33d6a990e7b42b60.... Buyer paid exactly 7,500,000 microCCD each, buyer fee 0, sponsor fee 4,991,315 each; summary and balances agree.
+- Three hostile buyers refused with no money moved (price over cap, payee differs from the registry wallet, fee payer not allowed).
+- A retry returned the stored verdict with no second charge; a third payment hit the payer daily cap; a replayed signed payment got no verdict and no charge.
+- Bugs found by the test and fixed: payer read from the wrong payload field, SDK throws on a policy denial, SDK needs CCD allowed explicitly, sponsor fee lives in sponsor.cost, SDK returns fee amounts as objects.
+- 88 tests pass on Node 24 and Node 22.23.4. Full logs: trajectory/x402/.
+- Still off on Render: X402_ENABLED is not set there, so the public tool is free until you decide to enable it.

@@ -43,3 +43,11 @@ Nothing below is built. Each item has a recommendation, so a one-word answer is 
 - Flow: build the sponsored flow from the official package first. A second payment option, where the client broadcasts and sends the transaction hash, comes after the first settled sponsored payment. Both would be offered in the same 402 `accepts` list. The how-to page's identity proof is not built because no source specifies it.
 - Request id (F): `pay_` plus the first 32 hex of sha256("<orderRef>:<proofSha256>"), or of the proof hash alone when there is no orderRef. Same id and same proof returns the stored result with no second charge. Same id and a different proof is rejected. Ids are kept for 24 hours.
 - Numbers (G), set from a measured fee, not guessed: price = 1.5 x the measured sponsor fee for one transfer, buyer cap per payment = 2 x price, buyer cap per day = 20 x price, sponsor budget per day = 50 x the measured fee. Testnet fees are large in CCD terms (a contract call cost 22.2 CCD), so these must be measured on the first settled payment.
+
+## Measured on 2026-11-07 (first settled sponsored payments, testnet)
+
+- The chain's own record of a sponsored transfer: `cost` (what the sender paid) is 0, and `sponsor.cost` (what the sponsor paid) is 4,991,315 microCCD. The transfer moved exactly the price to the registry wallet. So the fee split is confirmed from the chain, not assumed.
+- Sponsor fee per payment: 4,991,315 microCCD (about 4.99 CCD), identical across four settled payments.
+- Numbers now in force (G formula applied to the measured fee): estimated fee 5,000,000; price 7,500,000 (1.5x); buyer cap per payment 15,000,000 (2x price); buyer cap per day 150,000,000 (20x price); sponsor budget per day 250,000,000 (50x fee). All overridable by environment variables.
+- Doc versus code: the package docs show a top-level `sender` in the payment payload. The real client sends only `signedTransaction`, with the payer at `signedTransaction.header.sender`.
+- Doc versus code: the x402 client refuses non-stablecoin assets unless allowed. Native CCD must be listed in `spendControls.allowedAssets`.

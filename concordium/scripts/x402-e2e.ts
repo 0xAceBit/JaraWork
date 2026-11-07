@@ -38,7 +38,7 @@ const proof = (type: string, value: string, carrier = ''): string => JSON.string
 
 process.env.X402_ENABLED = 'true'
 process.env.X402_LEDGER_FILE = ledgerFile
-process.env.PAYER_DAILY_MAX_MICRO = '12000000' // two payments of 6 CCD, so the third must hit the cap
+process.env.PAYER_DAILY_MAX_MICRO = '15000000' // two payments of 7.5 CCD, so the third must hit the cap
 const cfg = loadPaymentsConfig()
 if (cfg === null || !/^[0-9a-fA-F]{64}$/.test(payerKey)) throw new Error('Missing sponsor or payer key in concordium/.env.')
 
@@ -99,6 +99,10 @@ expect(afterRefusals[PAYER] === before[PAYER], 'no money moved during the refusa
 const buyer = await open({}, true)
 const first = await buyer.validate(proof('tracking', '1Z999AA10123456784', 'UPS'), 'order-1')
 expect(first.paymentMade && first.verdict?.verdict === 'pass', 'paid call 1: verdict returned after settlement', first.settlement)
+if (!(first.paymentMade && first.verdict?.verdict === 'pass')) {
+  log('DIAGNOSTIC', { whatTheBuyerGot: first.raw, refusedByBuyer: first.refusedByBuyer, ledger: payments.ledger.all() })
+  process.exit(1) // stop here: the later steps depend on a settled payment
+}
 expect(payments.ledger.all().filter((r) => r.status === 'settled').length === 1, 'ledger holds one settled payment')
 
 const retry = await buyer.validate(proof('tracking', '1Z999AA10123456784', 'UPS'), 'order-1')

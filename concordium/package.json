@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test/validator.test.ts test/resolvePayee.test.ts test/agentWalletMessage.test.ts test/service.verdicts.test.ts test/service.tamper.test.ts test/service.mcp.test.ts test/payments.ledger.test.ts",
+    "test": "node --test test/validator.test.ts test/resolvePayee.test.ts test/agentWalletMessage.test.ts test/service.verdicts.test.ts test/service.tamper.test.ts test/service.mcp.test.ts test/payments.ledger.test.ts test/payments.accounting.test.ts",
     "smoke": "node smoke/run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "block": "node scripts/latest-block.ts"

@@ -1,0 +1,9 @@
+{
+  "payments": [],
+  "totals": {
+    "buyerPaidMicro": "0",
+    "sponsorFeesMicro": "0",
+    "payerBalanceChange": "0",
+    "sponsorBalanceChange": "0"
+  }
+}

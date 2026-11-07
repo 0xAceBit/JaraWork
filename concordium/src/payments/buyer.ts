@@ -69,6 +69,11 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
         }),
       },
     ],
+    // The x402 client only pays its "default assets" (stablecoins) unless told otherwise. Allow exactly
+    // native CCD on this network, with the same per-payment cap as our own policy: a second, independent guard.
+    spendControls: {
+      allowedAssets: [{ network: policy.network, asset: 'CCD', maxAmountPerPayment: policy.maxPerPaymentMicro.toString() }],
+    },
     autoPayment: true,
     onPaymentRequested: async ({ paymentRequired }) => {
       for (const accept of paymentRequired.accepts) {
@@ -100,7 +105,16 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
         }
         throw error
       }
-      const structured = (result as { structuredContent?: unknown }).structuredContent
+      // A paid response carries the verdict in its text content; read structuredContent when it is there.
+      const textPart = (result.content as { type: string; text?: string }[]).find((part) => part.type === 'text')?.text
+      let structured: unknown = (result as { structuredContent?: unknown }).structuredContent
+      if (structured === undefined && textPart !== undefined && !result.isError) {
+        try {
+          structured = JSON.parse(textPart)
+        } catch {
+          structured = undefined
+        }
+      }
       const settlement = (result.paymentResponse ?? null) as Record<string, unknown> | null
       if (result.paymentMade && settlement?.success === true && settlement.cached !== true) {
         spentMicro += approvedAmount
