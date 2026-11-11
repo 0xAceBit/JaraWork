@@ -42,6 +42,18 @@
     .dot.ok { background: #1fa45a; } .dot.bad { background: #d33; }
     a { color: var(--amber); font-weight: 600; text-decoration: none; } a:hover { text-decoration: underline; }
     .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: #fde7cf; color: #a24f06; margin-right: 6px; }
+    .small { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; }
+    .form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .form select, .form input { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fffdf9; color: var(--ink); }
+    .form input { flex: 1 1 220px; min-width: 0; }
+    .form button { font: inherit; font-weight: 700; padding: 9px 16px; border: 0; border-radius: 10px; background: var(--amber); color: #fff; cursor: pointer; }
+    .form button:hover { background: #cf6208; }
+    .samples { font-size: 13px; color: var(--muted); }
+    .samples a { margin-right: 10px; }
+    .out { margin-top: 12px; padding: 0; font-size: 14px; }
+    .out div { margin: 3px 0; }
+    .out.good { border-left: 4px solid #1fa45a; padding: 4px 12px; background: #f1fbf5; border-radius: 6px; }
+    .out.badc { border-left: 4px solid #d33; padding: 4px 12px; background: #fdf1f1; border-radius: 6px; }
     footer { margin-top: 26px; font-size: 12.5px; color: var(--muted); }
     code { background: #fbeedd; padding: 1px 6px; border-radius: 6px; font-size: 12.5px; }
   </style>
@@ -65,6 +77,29 @@
         <li>Tracking numbers: format checked for real; carrier status is a simulated stub and says so</li>
         <li>Free text: never auto-approved</li>
       </ul>
+    </section>
+
+    <section class="card">
+      <h2>Try a proof (free preview)</h2>
+      <p class="small">This preview checks the <b>format only</b>, offline and free. The real check is paid (7.5 testnet CCD per call). It also asks the carrier, loads the link, fetches IPFS content and returns an evidence hash. Run it over MCP, or with the <a href="https://github.com/0xAceBit/JaraWork/blob/concordium-hackathon/concordium/scripts/judge-demo.ts">judge demo script</a>.</p>
+      <div class="form">
+        <select id="p-type" aria-label="Proof type">
+          <option value="tracking">Tracking number</option>
+          <option value="url">Link</option>
+          <option value="ipfs">IPFS hash</option>
+          <option value="text">Free text</option>
+        </select>
+        <input id="p-value" type="text" maxlength="1024" placeholder="Paste a proof here" aria-label="Proof value" autocomplete="off" />
+        <button id="p-go" type="button">Check format</button>
+      </div>
+      <div class="samples">Try:
+        <a href="#" data-t="tracking" data-v="1Z999AA10123456784">valid UPS number</a>
+        <a href="#" data-t="tracking" data-v="RR123456784US">bad check digit</a>
+        <a href="#" data-t="url" data-v="https://example.com/proof">web link</a>
+        <a href="#" data-t="url" data-v="http://example.com/proof">insecure link</a>
+        <a href="#" data-t="ipfs" data-v="QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG">IPFS file</a>
+      </div>
+      <div id="p-out" class="out" role="status" aria-live="polite"></div>
     </section>
 
     <section class="card">
@@ -107,6 +142,33 @@
       } catch (e) {
         set('v-block', 'unavailable');
       }
+    })();
+  </script>
+  <script>
+    (function () {
+      var $ = function (id) { return document.getElementById(id); };
+      var out = $('p-out');
+      function show(cls, lines) {
+        out.className = 'out ' + cls;
+        out.textContent = '';
+        lines.forEach(function (line) { var d = document.createElement('div'); d.textContent = line; out.appendChild(d); });
+      }
+      async function run() {
+        show('', ['Checking...']);
+        try {
+          var res = await fetch('/demo/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: $('p-type').value, value: $('p-value').value }) });
+          if (res.status === 429) { show('badc', ['Too many requests. Please try again in a minute.']); return; }
+          var j = await res.json();
+          var lines = [(j.formatOk ? 'Format looks right' : 'Problem with the format') + ' (' + j.kind + ')', String(j.reason)];
+          if (j.notChecked && j.notChecked.length) lines.push('Not checked by this free preview: ' + j.notChecked.join('; ') + '.');
+          show(j.formatOk ? 'good' : 'badc', lines);
+        } catch (e) { show('badc', ['The preview is unavailable right now.']); }
+      }
+      document.querySelectorAll('.samples a').forEach(function (a) {
+        a.addEventListener('click', function (event) { event.preventDefault(); $('p-type').value = a.getAttribute('data-t'); $('p-value').value = a.getAttribute('data-v'); run(); });
+      });
+      $('p-go').addEventListener('click', run);
+      $('p-value').addEventListener('keydown', function (event) { if (event.key === 'Enter') run(); });
     })();
   </script>
 </body>

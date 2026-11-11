@@ -11,6 +11,7 @@ import { handleMcpRequest } from './src/service/mcpHttp.ts'
 import { createStubProbes } from './src/service/probes.ts'
 import { createRealProbes, gatewaysFromEnv } from './src/service/realProbes.ts'
 import { clientKey, createRateLimiter } from './src/service/rateLimit.ts'
+import { previewProof } from './src/service/preview.ts'
 import { resolveServiceMode } from './src/payments/config.ts'
 import { createPaymentContext } from './src/payments/paymentContext.ts'
 
@@ -57,6 +58,29 @@ async function handle(req, res, ctx) {
       }
       return await handleMcpRequest(req, res, ctx.probes, ctx.wrap)
     }
+    if (path === '/demo/preview') {
+      // A free, offline FORMAT preview for the web form. It is not the paid verdict and never touches the network.
+      if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'POST only' })
+      const decision = ctx.limiter.take(`preview:${clientKey(req.headers, req.socket.remoteAddress)}`)
+      if (!decision.ok) {
+        res.setHeader('retry-after', String(decision.retryAfterSeconds))
+        return json(res, 429, { ok: false, error: 'Too many requests. Try again later.' })
+      }
+      const chunks = []
+      let size = 0
+      for await (const chunk of req) {
+        size += chunk.length
+        if (size > 4096) return json(res, 413, { ok: false, error: 'Request too large.' })
+        chunks.push(chunk)
+      }
+      let input
+      try {
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      } catch {
+        return json(res, 400, { ok: false, error: 'Send JSON.' })
+      }
+      return json(res, 200, previewProof(input))
+    }
     if (path === '/x402/status') {
       if (ctx.closedReason !== undefined) return json(res, 200, { enabled: false, mode: 'closed', reason: ctx.closedReason })
       return json(res, 200, ctx.paymentStatus ? ctx.paymentStatus() : { enabled: false, mode: 'free' })
@@ -72,7 +96,7 @@ async function handle(req, res, ctx) {
         service: 'jarawork-concordium',
         description: 'Isolated Concordium hackathon service for JaraWork. Testnet only.',
         network: NETWORK,
-        routes: ['/health', '/chain', '/mcp', '/.well-known/agent-card.json'],
+        routes: ['/health', '/chain', '/mcp', '/demo/preview', '/.well-known/agent-card.json'],
       })
     }
     if (path === '/og-image.svg') {

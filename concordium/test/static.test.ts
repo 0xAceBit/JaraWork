@@ -41,3 +41,16 @@ void describe('share preview image and page tags', () => {
     })
   })
 })
+
+void describe('the try-a-proof form', () => {
+  void it('is on the page, labelled as a free format preview, and writes results as text only', async () => {
+    await withServer(async (base) => {
+      const html = await (await fetch(`${base}/`, { headers: { accept: 'text/html' } })).text()
+      assert.match(html, /id="p-go"/)
+      assert.match(html, /free preview/i)
+      assert.match(html, /format only/i)
+      const script = html.slice(html.lastIndexOf('<script>'))
+      assert.doesNotMatch(script, /innerHTML|document\.write|eval\(/, 'results must be written with textContent only')
+    })
+  })
+})

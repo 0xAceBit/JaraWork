@@ -4,6 +4,23 @@ A validator service for JaraWork delivery proofs, built for the Concordium Trust
 
 Built with [Arc Studio](https://studio.arc.io)
 
+## For judges: the 3-minute version
+
+**What it is.** A registered, badge-verified Concordium agent that checks the proof a worker submits for a JaraWork escrow order (a tracking number, a link, an IPFS hash) and answers pass or fail with a reason and an evidence hash. It is paid per call over x402 with fees sponsored, and a Node buyer verifies the agent from the registry before it pays anything.
+
+**Why it matters.** JaraWork today releases a worker's payment after a timer without reading the proof. This agent is a trusted second opinion in front of that release: release early, flag, or fall back to the timer. Its identity, price and payee are publicly verifiable on Concordium instead of taken on faith.
+
+**Verify it yourself in three minutes (free, no account):**
+1. Open Concordium's own check: https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu and look for `badge_valid: true`.
+2. Open https://jarawork-agent.onrender.com and try the free format preview.
+3. Run `node scripts/judge-demo.ts`: it verifies the validator from the registry (registered, active, card hash equals the chain, endpoint, payee). Add `--pay` with your own testnet account to run four orders end to end.
+
+**What is real:** the registration and badge, the sponsored x402 payments with the fee split read from the chain, the payee taken from the registry, the buyer's refusals, and the link check (a guarded request). **What is simulated, and says so in every answer:** carrier delivery status. **What is not connected yet:** the Arc escrow (orders are a stub store). Details and diagrams: [docs/architecture.md](docs/architecture.md).
+
+**Evidence:** registry token 1008 on testnet; registration `2b829c80…c336`; four paid verdicts in [trajectory/judge-demo-2026-11-11-run2.txt](trajectory/judge-demo-2026-11-11-run2.txt); a 22-check live end-to-end log in `trajectory/x402/`; 230+ tests; a public self-review that found 15 problems and fixed the serious ones: [docs/09-judge-review.md](docs/09-judge-review.md). Submission list: [docs/submission-checklist.md](docs/submission-checklist.md). Video script: [docs/demo-video-script.md](docs/demo-video-script.md).
+
+**Path to production (not built, written down):** key custody in a managed secrets service with separate owner, payee and sponsor keys; validator reputation and signed verdicts; a dispute path; mainnet configuration; and reconciliation between the Arc escrow (USDC) and the Concordium payment (CCD). See the last section of the review.
+
 This module lives on the `concordium-hackathon` branch and is not part of the live JaraWork app. Do not merge it to `main` until it has been tested.
 
 ## What it does
@@ -141,7 +158,7 @@ The service is paid by default and fails closed. If it is not configured correct
 
 - **Service:** https://jarawork-agent.onrender.com (a page with live status, the Agent Card and the testnet block).
 - **Verify the validator yourself (free, no account):** `node scripts/judge-demo.ts` checks the agent in the Concordium registry: registered, active, card hash equal to the chain, endpoint, payee.
-- **Run the whole flow (needs your own Concordium testnet account with test CCD):** put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env`, then `node scripts/judge-demo.ts --pay`. It runs three stub orders: verify, pay over x402, get a verdict, decide. A recorded run is in `trajectory/judge-demo-2026-11-11.txt`.
+- **Run the whole flow (needs your own Concordium testnet account with test CCD):** put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env`, then `node scripts/judge-demo.ts --pay`. It runs four stub orders: verify, pay over x402, get a verdict, decide. One of them uses the real link check. A recorded run is in `trajectory/judge-demo-2026-11-11-run2.txt`.
 - **Call the tool directly from an MCP client:** connect to `https://jarawork-agent.onrender.com/mcp` and call `validate_delivery_proof`. The service is paid: an unpaid call returns the payment requirement (7.5 CCD, paid to the registry wallet, fees sponsored).
 
 Honest limits:
