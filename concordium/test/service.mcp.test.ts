@@ -10,7 +10,7 @@ import { sha256Hex } from '../src/service/evidence.ts'
 const CARD_FILE = new URL('../public/agent-card.json', import.meta.url)
 // The hash pinned on chain for token 1008 (setAgentURI, 2026-11-05). If you edit the card
 // you MUST re-host and re-pin it (scripts/registry 06 and 07) and update this constant.
-const PINNED_CARD_SHA256 = '37108d208a53d554f27cc9b198564eb6baafc7b1fb035d293ae3ae2a03c669f6'
+const PINNED_CARD_SHA256 = 'a5a7ed0ac2a0c8693d38080d7be2db937b579ae726d6d9e9a40ba3f77ab7b0cb'
 const CID_V0 = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'
 const proof = (type: string, value: string, carrier = ''): string => JSON.stringify({ type, value, carrier, note: '' })
 

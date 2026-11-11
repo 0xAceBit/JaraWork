@@ -64,5 +64,13 @@
       "agentId": 1008,
       "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
     }
-  ]
+  ],
+  "services": [
+    {
+      "name": "MCP",
+      "endpoint": "https://jarawork-agent.onrender.com/mcp",
+      "version": "2025-06-18"
+    }
+  ],
+  "x402Support": true
 }
