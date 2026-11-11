@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { describe, it } from 'node:test'
 import { decideRelease, sweep, type DecideDeps, type Payer, type PayResult } from '../src/buyer/decide.ts'
 import { StubOrderStore, type StubOrder } from '../src/buyer/orderStore.ts'
+import { PaidLog } from '../src/buyer/paidLog.ts'
+import { parseProof } from '../src/service/envelope.ts'
+import { evidenceHashFor } from '../src/service/evidence.ts'
+import { createStubProbes } from '../src/service/probes.ts'
+import { validateDeliveryProof } from '../src/service/validate.ts'
 import type { VerifyResult } from '../src/buyer/verifyValidator.ts'
 
 const sha = (t: string): string => createHash('sha256').update(t).digest('hex')
@@ -16,10 +24,13 @@ const VERIFIED: VerifyResult = {
 const REFUSED: VerifyResult = { ok: false, code: 'HASH_MISMATCH', reason: 'card does not match', retryable: false, step: '4' }
 
 function verdictFor(o: StubOrder, orderRef: string, over: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
+  const base = {
     schemaVersion: '1', verdict: 'pass', kind: 'tracking', code: 'OK', reason: 'ok', retryable: false, simulated: false,
-    evidenceHash: sha(`evidence-${o.key}`), proofSha256: sha(o.proof), orderRef, ...over,
+    checks: [{ name: 'format', ok: true, simulated: false }], proofSha256: sha(o.proof), orderRef, ...over,
   }
+  const parsed = parseProof(o.proof)
+  const evidenceHash = evidenceHashFor({ kind: base.kind as never, proof: base.code === 'BAD_INPUT' || !parsed.ok ? null : parsed.envelope, checks: base.checks as never })
+  return { evidenceHash, ...base }
 }
 function payerOf(answer: (o: StubOrder, ref: string, n: number) => Partial<PayResult> | Error): { payer: Payer; calls: string[] } {
   const calls: string[] = []
@@ -37,7 +48,7 @@ function payerOf(answer: (o: StubOrder, ref: string, n: number) => Partial<PayRe
   }
 }
 const deps = (payer: Payer, over: Partial<DecideDeps> = {}): DecideDeps => ({
-  badge: 'B', verify: () => Promise.resolve(VERIFIED), payer, demoMode: true, delay: () => Promise.resolve(), ...over,
+  badge: 'B', verify: () => Promise.resolve(VERIFIED), payerFor: () => payer, demoMode: true, delay: () => Promise.resolve(), ...over,
 })
 const passWith = (over: Record<string, unknown> = {}) => (o: StubOrder, ref: string): Partial<PayResult> => ({ verdict: verdictFor(o, ref, over) })
 
@@ -152,5 +163,72 @@ void describe('the stub order store and the sweep', () => {
   void it('refuses to exist next to the live mainnet configuration', () => {
     assert.throws(() => new StubOrderStore([], { CIRCLE_MAINNET_API_KEY: 'x' }), /live mainnet settings are present/)
     assert.throws(() => new StubOrderStore([], { VITE_MAINNET_ESCROW_CONTRACT_ADDRESS: '0x52A3' }), /live mainnet settings are present/)
+  })
+})
+
+void describe('the payer is bound to the verified endpoint (F6)', () => {
+  void it('the payer is built for the endpoint the card vouches for, and no other', async () => {
+    const asked: string[] = []
+    const { payer } = payerOf(passWith())
+    const verified: VerifyResult = { ok: true, validator: { ...VERIFIED.ok ? VERIFIED.validator : ({} as never), endpoint: 'https://validator.example/mcp' } }
+    const d = await decideRelease(order('1'), deps(payer, { verify: () => Promise.resolve(verified), payerFor: (endpoint) => {
+      asked.push(endpoint)
+      return payer
+    } }))
+    assert.equal(d.outcome, 'RELEASE_NOW')
+    assert.deepEqual(asked, ['https://validator.example/mcp'])
+  })
+
+  void it('a refused validator never even builds a payer', async () => {
+    let built = 0
+    const { payer } = payerOf(passWith())
+    await decideRelease(order('1'), deps(payer, { verify: () => Promise.resolve(REFUSED), payerFor: () => {
+      built += 1
+      return payer
+    } }))
+    assert.equal(built, 0)
+  })
+})
+
+void describe('the evidence hash is recomputed by the buyer (F7)', () => {
+  void it('accepts the verdict the REAL validator produces', async () => {
+    const o = order('real')
+    const real = await validateDeliveryProof({ proof: o.proof, orderRef: o.orderRef }, createStubProbes(), () => new Date('2026-11-11T10:00:00Z'))
+    assert.equal(real.verdict, 'pass')
+    const { payer } = payerOf(() => ({ verdict: { ...real } as unknown as Record<string, unknown> }))
+    assert.equal((await decideRelease(o, deps(payer))).outcome, 'RELEASE_NOW')
+  })
+
+  for (const [label, edit] of [
+    ['a check was flipped after hashing', (v: Record<string, unknown>) => ({ ...v, checks: (v.checks as { ok: boolean }[]).map((c) => ({ ...c, ok: !c.ok })) })],
+    ['the kind was changed after hashing', (v: Record<string, unknown>) => ({ ...v, kind: 'url' })],
+    ['the checks were removed', (v: Record<string, unknown>) => ({ ...v, checks: undefined })],
+    ['a check was added', (v: Record<string, unknown>) => ({ ...v, checks: [...(v.checks as unknown[]), { name: 'carrier_status', ok: true, simulated: false }] })],
+  ] as const) {
+    void it(`is not believed when ${label}`, async () => {
+      const o = order('tamper')
+      const real = await validateDeliveryProof({ proof: o.proof, orderRef: o.orderRef }, createStubProbes(), () => new Date('2026-11-11T10:00:00Z'))
+      const { payer } = payerOf(() => ({ verdict: edit({ ...real }) }))
+      const d = await decideRelease(o, deps(payer))
+      assert.equal(d.outcome, 'DEFER_TO_TIMER')
+      assert.equal(d.code, 'VERDICT_UNTRUSTED')
+    })
+  }
+})
+
+void describe('the buyer remembers what it paid for (restart safety)', () => {
+  void it('never pays twice for the same request, even with a new buyer process reading the same file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'paidlog-'))
+    const file = join(dir, 'paid.jsonl')
+    const first = payerOf(passWith())
+    const d1 = await decideRelease(order('1'), deps(first.payer, { paidLog: new PaidLog(file) }))
+    assert.equal(d1.outcome, 'RELEASE_NOW')
+    assert.equal(first.calls.length, 1)
+
+    // A restart: a fresh PaidLog over the same file, and the same order is swept again.
+    const second = payerOf(passWith())
+    const d2 = await decideRelease(order('1'), deps(second.payer, { paidLog: new PaidLog(file) }))
+    assert.equal(d2.code, 'ALREADY_PAID')
+    assert.equal(second.calls.length, 0, 'no second payment')
   })
 })

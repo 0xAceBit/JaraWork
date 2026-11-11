@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { ConcordiumGRPCWebClient } from '@concordium/web-sdk'
 import { handleMcpRequest } from './src/service/mcpHttp.ts'
 import { createStubProbes } from './src/service/probes.ts'
-import { loadPaymentsConfig } from './src/payments/config.ts'
+import { resolveServiceMode } from './src/payments/config.ts'
 import { createPaymentContext } from './src/payments/paymentContext.ts'
 
 // Local development only: on Render there is no .env file and the host provides the environment.
@@ -36,13 +36,22 @@ function json(res, status, body) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
- * @param {{ probes: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown> }} ctx
+ * @param {{ probes: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string }} ctx
  */
 async function handle(req, res, ctx) {
   const path = (req.url ?? '/').split('?')[0]
   try {
-    if (path === '/mcp') return await handleMcpRequest(req, res, ctx.probes, ctx.wrap)
-    if (path === '/x402/status') return json(res, 200, ctx.paymentStatus ? ctx.paymentStatus() : { enabled: false })
+    if (path === '/mcp') {
+      // Fail closed: a paid service that is not properly configured refuses, it never serves for free.
+      if (ctx.closedReason !== undefined) {
+        return json(res, 503, { jsonrpc: '2.0', error: { code: -32000, message: 'This service is closed: payments are not configured.' }, id: null })
+      }
+      return await handleMcpRequest(req, res, ctx.probes, ctx.wrap)
+    }
+    if (path === '/x402/status') {
+      if (ctx.closedReason !== undefined) return json(res, 200, { enabled: false, mode: 'closed', reason: ctx.closedReason })
+      return json(res, 200, ctx.paymentStatus ? ctx.paymentStatus() : { enabled: false, mode: 'free' })
+    }
     if (path === '/') {
       // Browsers get the friendly page; API clients (no text/html in Accept) keep the JSON description.
       if ((req.headers.accept ?? '').includes('text/html')) {
@@ -93,10 +102,10 @@ async function handle(req, res, ctx) {
 
 /**
  * Builds the HTTP server without starting it, so tests can run it on a random port.
- * @param {{ probes?: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown> }} [options]
+ * @param {{ probes?: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string }} [options]
  */
 export function createAppServer(options = {}) {
-  const ctx = { probes: options.probes ?? createStubProbes(), wrap: options.wrap, paymentStatus: options.paymentStatus }
+  const ctx = { probes: options.probes ?? createStubProbes(), wrap: options.wrap, paymentStatus: options.paymentStatus, closedReason: options.closedReason }
   return createServer((req, res) => {
     void handle(req, res, ctx)
   })
@@ -104,15 +113,25 @@ export function createAppServer(options = {}) {
 
 // Start listening only when run directly (`node server.mjs`), not when imported by a test.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  // Paid mode starts only when X402_ENABLED=true; otherwise the tool stays free, as before.
-  const paymentsConfig = loadPaymentsConfig()
+  // Paid by default. Free verdicts need X402_MODE=free on purpose; a broken paid setup closes the tool endpoint.
+  const service = resolveServiceMode()
   let payments
-  if (paymentsConfig) {
-    const { ConcordiumGRPCNodeClient, credentials } = await import('@concordium/web-sdk/nodejs')
-    const chain = new ConcordiumGRPCNodeClient(paymentsConfig.grpcHost, paymentsConfig.grpcPort, credentials.createSsl(), { timeout: 20_000 })
-    payments = await createPaymentContext(paymentsConfig, chain)
+  let closedReason
+  if (service.mode === 'paid') {
+    try {
+      const { ConcordiumGRPCNodeClient, credentials } = await import('@concordium/web-sdk/nodejs')
+      const chain = new ConcordiumGRPCNodeClient(service.config.grpcHost, service.config.grpcPort, credentials.createSsl(), { timeout: 20_000 })
+      payments = await createPaymentContext(service.config, chain)
+    } catch (error) {
+      closedReason = `Paid mode could not start: ${error instanceof Error ? error.message : 'unknown error'}`.slice(0, 220)
+    }
+  } else if (service.mode === 'closed') {
+    closedReason = service.reason
+  } else {
+    console.log(JSON.stringify({ event: 'x402.free_mode', warning: 'Free verdicts were enabled explicitly with X402_MODE=free.' }))
   }
-  const server = createAppServer(payments ? { wrap: payments.wrap, paymentStatus: payments.status } : {})
+  if (closedReason !== undefined) console.error(JSON.stringify({ event: 'x402.closed', reason: closedReason }))
+  const server = createAppServer({ ...(payments ? { wrap: payments.wrap, paymentStatus: payments.status } : {}), ...(closedReason === undefined ? {} : { closedReason }) })
   server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
 
   // Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.

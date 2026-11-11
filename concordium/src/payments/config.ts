@@ -1,6 +1,7 @@
 /**
- * Payment configuration. Paid mode is OFF unless X402_ENABLED=true, so the public service
- * keeps working as a free demo until the sponsor key is set on the host.
+ * Payment configuration. The service is PAID by default and fails CLOSED: free verdicts are only
+ * served when X402_MODE=free is set explicitly, and a paid service that is misconfigured refuses
+ * to serve instead of silently falling back to free.
  * The facilitator key comes only from the environment and is never logged.
  * Amounts are whole microCCD (1 CCD = 1,000,000). Defaults follow docs/08: a sponsored
  * transfer is estimated at 4 CCD; price = 1.5x that. Re-measure on the first settled payment.
@@ -21,7 +22,9 @@ export interface PaymentsConfig {
   payerDailyMaxMicro: bigint
   sponsorDailyBudgetMicro: bigint
   maxTimeoutSeconds: number
-  ledgerFile: string | null
+  ledgerFile: string
+  /** True only if the operator declared the ledger file lives on durable storage. */
+  ledgerDurable: boolean
 }
 
 type Env = Record<string, string | undefined>
@@ -33,11 +36,22 @@ function micro(env: Env, name: string, fallback: bigint): bigint {
   return BigInt(raw)
 }
 
-export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig | null {
-  if (env.X402_ENABLED !== 'true') return null
+export type ServiceMode =
+  | { mode: 'free' }
+  | { mode: 'paid'; config: PaymentsConfig }
+  | { mode: 'closed'; reason: string }
+
+/** Builds the paid configuration, or throws a message that never contains a secret. */
+export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig {
   const key = (env.CCD_FACILITATOR_PRIVATE_KEY ?? env.CCD_SPONSOR_PRIVATE_KEY ?? '').trim().replace(/^0x/i, '')
   if (!/^[0-9a-fA-F]{64}$/.test(key)) {
-    throw new Error('X402_ENABLED is true but the facilitator key is missing or not 64 hex characters (value not shown).')
+    throw new Error('The facilitator key is missing or not 64 hex characters (value not shown).')
+  }
+  // The ledger holds the idempotency, replay and spend-cap state. A restart that wipes it can charge
+  // the same request twice, so the operator must say where it lives, or accept the risk explicitly.
+  const durable = env.X402_LEDGER_DURABLE === 'true'
+  if (!durable && env.X402_ALLOW_EPHEMERAL_LEDGER !== 'true') {
+    throw new Error('The payment ledger is not declared durable. Set X402_LEDGER_DURABLE=true if the ledger file is on persistent storage, or X402_ALLOW_EPHEMERAL_LEDGER=true to accept that a restart resets it.')
   }
   const estimatedSponsorFeeMicro = micro(env, 'ESTIMATED_SPONSOR_FEE_MICRO', 5_000_000n)
   return {
@@ -52,7 +66,25 @@ export function loadPaymentsConfig(env: Env = process.env): PaymentsConfig | nul
     payerDailyMaxMicro: micro(env, 'PAYER_DAILY_MAX_MICRO', 150_000_000n),
     sponsorDailyBudgetMicro: micro(env, 'SPONSOR_DAILY_BUDGET_MICRO', 250_000_000n),
     maxTimeoutSeconds: Number(env.X402_MAX_TIMEOUT_SECONDS ?? 60),
-    ledgerFile: env.X402_LEDGER_FILE ?? null,
+    ledgerFile: env.X402_LEDGER_FILE ?? '.data/payments.jsonl',
+    ledgerDurable: durable,
+  }
+}
+
+/**
+ * Decides how the service behaves. Default is PAID. Free verdicts need X402_MODE=free on purpose.
+ * Any problem with a paid setup yields 'closed' (the tool endpoint refuses), never 'free'.
+ */
+export function resolveServiceMode(env: Env = process.env): ServiceMode {
+  const requested = (env.X402_MODE ?? '').trim().toLowerCase()
+  if (requested === 'free') return { mode: 'free' }
+  if (requested !== '' && requested !== 'paid') {
+    return { mode: 'closed', reason: 'X402_MODE must be "paid" or "free".' }
+  }
+  try {
+    return { mode: 'paid', config: loadPaymentsConfig(env) }
+  } catch (error) {
+    return { mode: 'closed', reason: error instanceof Error ? error.message : 'Paid mode could not be configured.' }
   }
 }
 
@@ -67,5 +99,6 @@ export function describeConfig(c: PaymentsConfig): Record<string, string | numbe
     payerDailyMaxMicro: c.payerDailyMaxMicro.toString(),
     sponsorDailyBudgetMicro: c.sponsorDailyBudgetMicro.toString(),
     maxTimeoutSeconds: c.maxTimeoutSeconds,
+    ledgerDurable: String(c.ledgerDurable),
   }
 }

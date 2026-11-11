@@ -36,7 +36,7 @@ const expect = (ok: boolean, what: string, detail: unknown = ''): void => {
 }
 const proof = (type: string, value: string, carrier = ''): string => JSON.stringify({ type, value, carrier, note: '' })
 
-process.env.X402_ENABLED = 'true'
+process.env.X402_ALLOW_EPHEMERAL_LEDGER = 'true' // a local test file, declared on purpose
 process.env.X402_LEDGER_FILE = ledgerFile
 process.env.PAYER_DAILY_MAX_MICRO = '15000000' // two payments of 7.5 CCD, so the third must hit the cap
 const cfg = loadPaymentsConfig()
@@ -107,14 +107,38 @@ expect(payments.ledger.all().filter((r) => r.status === 'settled').length === 1,
 
 const retry = await buyer.validate(proof('tracking', '1Z999AA10123456784', 'UPS'), 'order-1')
 expect(retry.verdict?.evidenceHash === first.verdict?.evidenceHash, 'retry returns the stored verdict')
-expect(payments.ledger.all().length === 1, 'retry created no second payment')
+const live = (): number => payments.ledger.all().filter((r) => r.status !== 'failed').length
+expect(live() === 1, 'retry created no second payment')
+expect(retry.paymentMade === false, 'the retry was not charged')
+
+// F1: a forged payment that only names the real payer must NOT return the stored verdict.
+const forgedMeta = { 'x402/payment': { x402Version: 2, accepted: {}, payload: { signedTransaction: { header: { sender: PAYER } } } } }
+const forgedRes = await fetch(url, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'validate_delivery_proof', arguments: { proof: proof('tracking', '1Z999AA10123456784', 'UPS'), orderRef: 'order-1' }, _meta: forgedMeta } }),
+})
+const forgedJson = (await forgedRes.json()) as { result?: { content?: { text?: string }[] } }
+const forgedText = forgedJson.result?.content?.[0]?.text ?? ''
+log('attack.forged_cache_request', { gotVerdict: forgedText.includes('evidenceHash'), answer: forgedText.slice(0, 80) })
+expect(!forgedText.includes('evidenceHash'), 'F1: a forged payment naming the real payer gets NO stored verdict')
+
+// F5: answers that are not answers are not charged.
+const beforeNonAnswers = await readBalances(chain, who)
+const malformed = await buyer.validate('', 'order-bad')
+expect(malformed.verdict?.code === 'BAD_INPUT' && malformed.paymentMade === false, 'F5: malformed input answers BAD_INPUT and is not charged', malformed.verdict?.code)
+const inTransit = await buyer.validate(proof('tracking', '123456789012', 'FedEx'), 'order-transit')
+expect(inTransit.verdict?.retryable === true && inTransit.paymentMade === false, 'F5: an inconclusive check is not charged', inTransit.verdict?.code)
+const afterNonAnswers = await readBalances(chain, who)
+expect(afterNonAnswers[PAYER] === beforeNonAnswers[PAYER] && afterNonAnswers[cfg.facilitatorAddress] === beforeNonAnswers[cfg.facilitatorAddress], 'F5: no money moved for the non-answers')
+expect(payments.ledger.all().filter((r) => r.status === 'settled').length === 1, 'still exactly one settled payment')
 
 const second = await buyer.validate(proof('url', 'https://example.com/proof/42'), 'order-2')
 expect(second.paymentMade && second.verdict?.verdict === 'pass', 'paid call 2 settled', second.settlement)
 const paidBody = capturedPaid
 
 const third = await buyer.validate(proof('ipfs', 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'), 'order-3')
-expect(third.verdict === null && payments.ledger.all().length === 2, 'third payment refused by the payer daily cap, nothing charged', third.isError)
+expect(third.verdict === null && live() === 2, 'third payment refused by the payer daily cap, nothing charged', third.isError)
 
 // 3. Replay: present the already used signed payment again for a different proof.
 if (paidBody !== null) {
@@ -122,7 +146,7 @@ if (paidBody !== null) {
   forged.params.arguments.proof = proof('url', 'https://example.org/other')
   const replay = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify(forged) })
   const replayText = await replay.text()
-  expect(!replayText.includes('"verdict":"pass"') && payments.ledger.all().length === 2, 'replayed signed payment gets no verdict and no new payment')
+  expect(!replayText.includes('"verdict":"pass"') && live() === 2, 'replayed signed payment gets no verdict and no new payment')
 }
 await buyer.close()
 

@@ -7,4 +7,5 @@ export function createAppServer(options?: {
   probes?: Probes
   wrap?: ToolWrap
   paymentStatus?: () => Record<string, unknown>
+  closedReason?: string
 }): Server

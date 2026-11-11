@@ -82,3 +82,20 @@ Evidence labels: **RAN** executed by the reviewer, **LOG** shown in the demo log
 
 ## Overall
 Integration depth is strong and verifiable where it is real: registry, badge, sponsored payments, chain-checked accounting, hostile-buyer refusals. It is weak on the value being sold and on production readiness. The most damaging items for a judge are the free-verdict forgery (F1), the public service not charging (F2), the memory-only ledger (F3), and the stubbed core (F4). F1 and F3 are cheap to fix, F2 is one environment variable plus a fail-closed default, and F4 is the real work.
+
+## Fix status (2026-11-11)
+
+| # | Status | What changed | Proof |
+|---|---|---|---|
+| F1 | Fixed | A stored verdict is served only if the attached payment passes the facilitator's real signature check, names the original payer, and is used once. | Live: forged request refused ("the attached payment is not valid"); honest retry served and not charged. |
+| F2 | Fixed | The service is paid by default. Free needs `X402_MODE=free`. Any paid misconfiguration closes `/mcp` with a 503 and says why on `/x402/status`; the card and `/health` stay up. | Unit tests; closed server test. |
+| F3 | Partly fixed | The ledger always has a file path, a paid service must declare its durability (`X402_LEDGER_DURABLE=true`, or accept the risk with `X402_ALLOW_EPHEMERAL_LEDGER=true`), and the buyer now keeps its own paid log so a restart cannot make it pay twice. **Real durability on Render still needs a persistent disk or a database, which is your decision.** | Unit tests, including a restart over the same file. |
+| F5 | Fixed | Malformed input and inconclusive checks come back as answers but cancel the payment. | Live: both returned, no money moved, ledger closed as failed. |
+| F6 | Fixed | The payer is built for the endpoint the verified card vouches for, never a separately configured URL. | Unit tests. |
+| F7 | Fixed, with a limit | The buyer recomputes the evidence hash from its own proof and the reported checks, and refuses a verdict that does not match. This proves consistency, not truth: verdicts are still unsigned. | Unit tests, including a verdict from the real validator and four tamperings. |
+
+Not touched: F4 (the stubbed checks), F8 to F15.
+
+New observations from the rerun:
+- The sponsor's fee is not constant: 4,991,315 microCCD on 2026-11-07, 4,453,360 on 2026-11-11. Price and caps must track the chain's fee rate, not a one-off measurement.
+- Concordium's hosted registry can answer `REGISTRY_UNAVAILABLE` under load. The buyer fails closed (no payment), now after two short retries.

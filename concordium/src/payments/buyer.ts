@@ -51,7 +51,13 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
     if (BigInt(accept.amount) > policy.maxPerPaymentMicro) return `amount ${accept.amount} is above the per-payment cap ${policy.maxPerPaymentMicro}`
     if (spentMicro + BigInt(accept.amount) > policy.dailyMaxMicro) return 'the daily cap would be exceeded'
     if (accept.extra?.feePayer !== policy.allowedFeePayer) return `fee payer ${String(accept.extra?.feePayer)} is not the allowed sponsor`
-    const payee = await resolvePayee(policy.registryTokenAddress)
+    // The hosted registry can be briefly unavailable or rate limited. Retry a couple of times, then fail closed:
+    // an unconfirmed payee means no payment.
+    let payee = await resolvePayee(policy.registryTokenAddress)
+    for (let attempt = 0; attempt < 2 && !payee.ok && payee.code === 'REGISTRY_UNAVAILABLE'; attempt += 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 3000))
+      payee = await resolvePayee(policy.registryTokenAddress)
+    }
     if (!payee.ok) return `could not confirm the payee from the registry: ${payee.code}`
     if (accept.payTo !== payee.wallet) return `server asks to be paid at ${accept.payTo} but the registry says ${payee.wallet}`
     return null
@@ -105,23 +111,25 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
         }
         throw error
       }
-      // A paid response carries the verdict in its text content; read structuredContent when it is there.
+      // The verdict travels in the text content (structuredContent is not always present). A result marked as an
+      // error can still be an answer: "not charged" results (malformed input, inconclusive check) come back this way.
       const textPart = (result.content as { type: string; text?: string }[]).find((part) => part.type === 'text')?.text
-      let structured: unknown = (result as { structuredContent?: unknown }).structuredContent
-      if (structured === undefined && textPart !== undefined && !result.isError) {
+      let parsed: unknown = (result as { structuredContent?: unknown }).structuredContent
+      if (parsed === undefined && textPart !== undefined) {
         try {
-          structured = JSON.parse(textPart)
+          parsed = JSON.parse(textPart)
         } catch {
-          structured = undefined
+          parsed = undefined
         }
       }
+      const looksLikeVerdict = typeof parsed === 'object' && parsed !== null && (parsed as Record<string, unknown>).schemaVersion === '1' && typeof (parsed as Record<string, unknown>).verdict === 'string'
       const settlement = (result.paymentResponse ?? null) as Record<string, unknown> | null
-      if (result.paymentMade && settlement?.success === true && settlement.cached !== true) {
-        spentMicro += approvedAmount
-      }
+      // "Charged" means a new settlement happened. A cancelled payment or a cached retry is not a charge.
+      const charged = result.paymentMade && settlement?.success === true && settlement.cached !== true
+      if (charged) spentMicro += approvedAmount
       return {
-        verdict: result.isError ? null : ((structured ?? null) as Record<string, unknown> | null),
-        paymentMade: result.paymentMade,
+        verdict: looksLikeVerdict ? (parsed as Record<string, unknown>) : null,
+        paymentMade: charged,
         settlement,
         refusedByBuyer: refusal,
         isError: Boolean(result.isError),

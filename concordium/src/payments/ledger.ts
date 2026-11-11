@@ -78,7 +78,9 @@ export class PaymentLedger {
     if (file !== null && existsSync(file)) {
       for (const line of readFileSync(file, 'utf8').split('\n')) {
         if (line.trim() === '') continue
-        this.apply(JSON.parse(line) as PaymentRecord)
+        const parsed = JSON.parse(line) as PaymentRecord | { event: 'payload'; payloadHash: string }
+        if ('event' in parsed) this.payloads.add(parsed.payloadHash)
+        else this.apply(parsed)
       }
     }
   }
@@ -162,6 +164,20 @@ export class PaymentLedger {
     const next = { ...current, ...patch, updatedAt: this.now().toISOString() }
     this.save(next)
     return next
+  }
+
+  /**
+   * Marks a signed payment as used up. Returns false if it was already seen. Used when a payment is
+   * accepted only to prove who is asking for a stored verdict, so it cannot be replayed to fetch it again.
+   */
+  claimPayload(payloadHash: string): boolean {
+    if (this.payloads.has(payloadHash)) return false
+    this.payloads.add(payloadHash)
+    if (this.file !== null) {
+      mkdirSync(dirname(this.file), { recursive: true })
+      appendFileSync(this.file, `${JSON.stringify({ event: 'payload', payloadHash })}\n`)
+    }
+    return true
   }
 
   find(requestId: string): PaymentRecord | undefined {

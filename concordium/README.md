@@ -127,3 +127,12 @@ curl -s -X POST http://localhost:3002/mcp \
 ## The buyer
 
 `src/buyer/` is the Node port of the escrow decision. Before paying anything it verifies the validator from the registry (badge, active status, card hash, card endpoint, payee). Only then does it pay over x402, call the tool and decide: release now, flag for review, or fall back to the existing timer. `scripts/buyer-verify-live.ts` runs the verification against the real testnet registry without paying.
+
+## Modes and environment variables (paid service)
+
+The service is paid by default and fails closed. If it is not configured correctly, `/mcp` answers 503 and `/x402/status` says why; it never falls back to free.
+
+- `X402_MODE`: unset or `paid` (default), or `free` to serve verdicts without payment on purpose.
+- `CCD_FACILITATOR_PRIVATE_KEY` and `CCD_FACILITATOR_ADDRESS`: the sponsor account that pays fees. Secret; set on the host only.
+- `X402_LEDGER_DURABLE=true` if the ledger file is on persistent storage, or `X402_ALLOW_EPHEMERAL_LEDGER=true` to accept that a restart resets payment memory.
+- `X402_LEDGER_FILE` (default `.data/payments.jsonl`), `PRICE_MICRO_CCD`, `PAYER_DAILY_MAX_MICRO`, `SPONSOR_DAILY_BUDGET_MICRO`, `ESTIMATED_SPONSOR_FEE_MICRO`, `REGISTRY_TOKEN_ADDRESS`.
