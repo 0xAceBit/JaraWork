@@ -136,3 +136,12 @@ The service is paid by default and fails closed. If it is not configured correct
 - `CCD_FACILITATOR_PRIVATE_KEY` and `CCD_FACILITATOR_ADDRESS`: the sponsor account that pays fees. Secret; set on the host only.
 - `X402_LEDGER_DURABLE=true` if the ledger file is on persistent storage, or `X402_ALLOW_EPHEMERAL_LEDGER=true` to accept that a restart resets payment memory.
 - `X402_LEDGER_FILE` (default `.data/payments.jsonl`), `PRICE_MICRO_CCD`, `PAYER_DAILY_MAX_MICRO`, `SPONSOR_DAILY_BUDGET_MICRO`, `ESTIMATED_SPONSOR_FEE_MICRO`, `REGISTRY_TOKEN_ADDRESS`.
+
+## Try it
+
+- **Service:** https://jarawork-agent.onrender.com (a page with live status, the Agent Card and the testnet block).
+- **Verify the validator yourself (free, no account):** `node scripts/judge-demo.ts` checks the agent in the Concordium registry: registered, active, card hash equal to the chain, endpoint, payee.
+- **Run the whole flow (needs your own Concordium testnet account with test CCD):** put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env`, then `node scripts/judge-demo.ts --pay`. It runs three stub orders: verify, pay over x402, get a verdict, decide. A recorded run is in `trajectory/judge-demo-2026-11-11.txt`.
+- **Call the tool directly from an MCP client:** connect to `https://jarawork-agent.onrender.com/mcp` and call `validate_delivery_proof`. The service is paid: an unpaid call returns the payment requirement (7.5 CCD, paid to the registry wallet, fees sponsored).
+
+Honest limits: the carrier, link and IPFS lookups are simulated stubs and every verdict says so. Orders are a stub store; nothing here touches the JaraWork escrow or any mainnet.
