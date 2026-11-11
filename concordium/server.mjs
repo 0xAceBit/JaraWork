@@ -66,6 +66,11 @@ async function handle(req, res, ctx) {
         routes: ['/health', '/chain', '/mcp', '/.well-known/agent-card.json'],
       })
     }
+    if (path === '/og-image.svg') {
+      const image = await readFile(new URL('./public/og-image.svg', import.meta.url))
+      res.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=3600', 'content-length': image.length })
+      return res.end(image)
+    }
     if (path === '/.well-known/agent-card.json') {
       // Serve the file's raw bytes untouched: the on-chain hash is over these exact bytes.
       const bytes = await readFile(new URL('./public/agent-card.json', import.meta.url))

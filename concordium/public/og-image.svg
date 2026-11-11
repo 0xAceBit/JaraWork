@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a0a00"/>
+      <stop offset="100%" stop-color="#2d1200"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFB347"/>
+      <stop offset="100%" stop-color="#E8700A"/>
+    </linearGradient>
+    <linearGradient id="logoG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFB347"/>
+      <stop offset="100%" stop-color="#E65C00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Amber glow top-right -->
+  <ellipse cx="950" cy="120" rx="320" ry="200" fill="#E8700A" opacity="0.08"/>
+  <!-- Amber glow bottom-left -->
+  <ellipse cx="200" cy="520" rx="280" ry="180" fill="#E8700A" opacity="0.06"/>
+
+  <!-- Left accent bar -->
+  <rect x="80" y="180" width="5" height="120" rx="2.5" fill="#E8700A" opacity="0.9"/>
+
+  <!-- Logo mark (J shape) -->
+  <g transform="translate(96, 100)">
+    <rect width="88" height="88" rx="18" fill="#E8700A" opacity="0.15"/>
+    <rect width="88" height="88" rx="18" fill="none" stroke="#E8700A" stroke-width="1.5" opacity="0.4"/>
+    <text x="44" y="60" font-family="Georgia, serif" font-size="52" font-weight="700" fill="#FFB347" text-anchor="middle">J</text>
+  </g>
+
+  <!-- Brand name -->
+  <text x="204" y="152" font-family="'Space Grotesk', 'DM Sans', Arial, sans-serif" font-size="44" font-weight="700" fill="#FFFFFF" letter-spacing="-1">JaraWork</text>
+  <text x="204" y="178" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="400" fill="#E8700A" letter-spacing="3" text-transform="uppercase">PROOF VALIDATOR · CONCORDIUM</text>
+
+  <!-- Divider -->
+  <rect x="96" y="210" width="1008" height="1.5" fill="#E8700A" opacity="0.2"/>
+
+  <!-- Main headline -->
+  <text x="96" y="305" font-family="'Space Grotesk', 'DM Sans', Arial, sans-serif" font-size="72" font-weight="700" fill="#FFFFFF" letter-spacing="-2">Delivery proofs,</text>
+  <text x="96" y="385" font-family="'Space Grotesk', 'DM Sans', Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-2">
+    <tspan fill="#E8700A">checked</tspan>
+    <tspan fill="#FFFFFF"> for escrow.</tspan>
+  </text>
+
+  <!-- Sub-headline -->
+  <text x="96" y="440" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="400" fill="#c9a57a">Tracking numbers, links and IPFS hashes: pass or fail, with a reason.</text>
+
+  <!-- Feature pills -->
+  <!-- Pill 1 -->
+  <rect x="96" y="478" width="200" height="44" rx="22" fill="#E8700A" opacity="0.15" stroke="#E8700A" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="196" y="505" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="600" fill="#FFB347" text-anchor="middle">Pass or Fail</text>
+
+  <!-- Pill 2 -->
+  <rect x="312" y="478" width="200" height="44" rx="22" fill="#E8700A" opacity="0.15" stroke="#E8700A" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="412" y="505" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="600" fill="#FFB347" text-anchor="middle">Verified Agent</text>
+
+  <!-- Pill 3 -->
+  <rect x="528" y="478" width="220" height="44" rx="22" fill="#E8700A" opacity="0.15" stroke="#E8700A" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="638" y="505" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="600" fill="#FFB347" text-anchor="middle">MCP Tool</text>
+
+  <!-- Pill 4 -->
+  <rect x="764" y="478" width="180" height="44" rx="22" fill="#E8700A" opacity="0.15" stroke="#E8700A" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="854" y="505" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="600" fill="#FFB347" text-anchor="middle">Testnet Demo</text>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="580" width="1200" height="50" fill="#E8700A" opacity="0.08"/>
+  <rect x="0" y="580" width="1200" height="1.5" fill="#E8700A" opacity="0.25"/>
+  <text x="96" y="612" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="500" fill="#c9a57a">jarawork-agent.onrender.com</text>
+  <text x="1104" y="612" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="400" fill="#c9a57a" text-anchor="end">Operated by Ace Corporation</text>
+</svg>
