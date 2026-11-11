@@ -100,7 +100,7 @@ async function examineUrl(envelope: ProofEnvelope, probes: Probes): Promise<Outc
   }
   const checks = [formatRecord, record]
   const note = probes.link.simulated ? SIMULATED_NOTE : ''
-  if (probe.status === 'reachable') return outcome('url', 'OK', `The link is well formed and reachable.${note}`, checks)
+  if (probe.status === 'reachable') return outcome('url', 'OK', `The link is well formed and responds. This does not confirm what it shows.${note}`, checks)
   if (probe.status === 'unavailable') return outcome('url', 'UNREACHABLE', 'The link check is unavailable right now.', checks, true)
   return outcome('url', 'UNREACHABLE', `The link could not be reached.${note}`, checks)
 }

@@ -144,4 +144,14 @@ The service is paid by default and fails closed. If it is not configured correct
 - **Run the whole flow (needs your own Concordium testnet account with test CCD):** put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env`, then `node scripts/judge-demo.ts --pay`. It runs three stub orders: verify, pay over x402, get a verdict, decide. A recorded run is in `trajectory/judge-demo-2026-11-11.txt`.
 - **Call the tool directly from an MCP client:** connect to `https://jarawork-agent.onrender.com/mcp` and call `validate_delivery_proof`. The service is paid: an unpaid call returns the payment requirement (7.5 CCD, paid to the registry wallet, fees sponsored).
 
-Honest limits: the carrier, link and IPFS lookups are simulated stubs and every verdict says so. Orders are a stub store; nothing here touches the JaraWork escrow or any mainnet.
+Honest limits:
+- **Links are checked for real** (a guarded request: https only, internal addresses refused, redirects re-checked). A responding link does not prove it shows the delivery.
+- **IPFS retrieval is real but unreliable from shared servers:** public gateways rate-limit them, so the answer is often "unavailable, try later" (not charged). Set `IPFS_GATEWAYS` to your own gateway for dependable results.
+- **Carrier status is a simulated stub** and every such verdict says so.
+- Orders are a stub store; nothing here touches the JaraWork escrow or any mainnet.
+
+## More settings
+
+- `LIVE_LINK_CHECKS=false` turns the real link and IPFS checks off (labelled stubs instead).
+- `IPFS_GATEWAYS` comma-separated https gateways for IPFS retrieval.
+- `RATE_LIMIT_PER_MIN` (default 60 per client) and `RATE_LIMIT_GLOBAL_PER_MIN` (default 600 in total) limit calls to `/mcp`.

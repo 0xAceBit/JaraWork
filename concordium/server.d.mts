@@ -8,4 +8,5 @@ export function createAppServer(options?: {
   wrap?: ToolWrap
   paymentStatus?: () => Record<string, unknown>
   closedReason?: string
+  limiter?: import('./src/service/rateLimit.ts').RateLimiter
 }): Server

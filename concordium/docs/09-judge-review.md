@@ -99,3 +99,10 @@ Not touched: F4 (the stubbed checks), F8 to F15.
 New observations from the rerun:
 - The sponsor's fee is not constant: 4,991,315 microCCD on 2026-11-07, 4,453,360 on 2026-11-11. Price and caps must track the chain's fee rate, not a one-off measurement.
 - Concordium's hosted registry can answer `REGISTRY_UNAVAILABLE` under load. The buyer fails closed (no payment), now after two short retries.
+
+## Update 2026-11-11 (later): F4 and F10
+
+| # | Status | What changed |
+|---|---|---|
+| F4 | Partly fixed | Link reachability and IPFS retrieval are now real network checks with an SSRF guard (https only, port 443, no IP literals, every resolved address must be public, connection pinned to the checked address, redirects re-checked, 5 second limit, headers only). Tested with fakes (66 tests) and against the real internet. Carrier status is still a simulated stub. Public IPFS gateways rate-limit shared servers (429), so retrieval is often "unavailable". |
+| F10 | Partly fixed | A per-client and a global rate limit on `/mcp`. The client key comes from a forwarded header that can be faked, so the global limit is the backstop. State is per process. Sponsor-fee griefing remains UNVERIFIED. |

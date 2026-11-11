@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { ConcordiumGRPCWebClient } from '@concordium/web-sdk'
 import { handleMcpRequest } from './src/service/mcpHttp.ts'
 import { createStubProbes } from './src/service/probes.ts'
+import { createRealProbes, gatewaysFromEnv } from './src/service/realProbes.ts'
+import { clientKey, createRateLimiter } from './src/service/rateLimit.ts'
 import { resolveServiceMode } from './src/payments/config.ts'
 import { createPaymentContext } from './src/payments/paymentContext.ts'
 
@@ -36,7 +38,7 @@ function json(res, status, body) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
- * @param {{ probes: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string }} ctx
+ * @param {{ probes: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string, limiter: import('./src/service/rateLimit.ts').RateLimiter }} ctx
  */
 async function handle(req, res, ctx) {
   const path = (req.url ?? '/').split('?')[0]
@@ -45,6 +47,13 @@ async function handle(req, res, ctx) {
       // Fail closed: a paid service that is not properly configured refuses, it never serves for free.
       if (ctx.closedReason !== undefined) {
         return json(res, 503, { jsonrpc: '2.0', error: { code: -32000, message: 'This service is closed: payments are not configured.' }, id: null })
+      }
+      if (req.method === 'POST') {
+        const decision = ctx.limiter.take(clientKey(req.headers, req.socket.remoteAddress))
+        if (!decision.ok) {
+          res.setHeader('retry-after', String(decision.retryAfterSeconds))
+          return json(res, 429, { jsonrpc: '2.0', error: { code: -32000, message: 'Too many requests. Try again later.' }, id: null })
+        }
       }
       return await handleMcpRequest(req, res, ctx.probes, ctx.wrap)
     }
@@ -107,10 +116,14 @@ async function handle(req, res, ctx) {
 
 /**
  * Builds the HTTP server without starting it, so tests can run it on a random port.
- * @param {{ probes?: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string }} [options]
+ * @param {{ probes?: import('./src/service/probes.ts').Probes, wrap?: import('./src/service/mcp.ts').ToolWrap, paymentStatus?: () => Record<string, unknown>, closedReason?: string, limiter?: import('./src/service/rateLimit.ts').RateLimiter }} [options]
  */
 export function createAppServer(options = {}) {
-  const ctx = { probes: options.probes ?? createStubProbes(), wrap: options.wrap, paymentStatus: options.paymentStatus, closedReason: options.closedReason }
+  const ctx = { probes: options.probes ?? createStubProbes(), wrap: options.wrap,
+    paymentStatus: options.paymentStatus,
+    closedReason: options.closedReason,
+    limiter: options.limiter ?? createRateLimiter({ perKeyLimit: Number(process.env.RATE_LIMIT_PER_MIN ?? 60), globalLimit: Number(process.env.RATE_LIMIT_GLOBAL_PER_MIN ?? 600), windowMs: 60_000 }),
+  }
   return createServer((req, res) => {
     void handle(req, res, ctx)
   })
@@ -136,7 +149,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(JSON.stringify({ event: 'x402.free_mode', warning: 'Free verdicts were enabled explicitly with X402_MODE=free.' }))
   }
   if (closedReason !== undefined) console.error(JSON.stringify({ event: 'x402.closed', reason: closedReason }))
-  const server = createAppServer({ ...(payments ? { wrap: payments.wrap, paymentStatus: payments.status } : {}), ...(closedReason === undefined ? {} : { closedReason }) })
+  // Real link and IPFS checks by default; LIVE_LINK_CHECKS=false falls back to the labelled stubs.
+  const probes = process.env.LIVE_LINK_CHECKS === 'false' ? createStubProbes() : createRealProbes(undefined, { gateways: gatewaysFromEnv(process.env.IPFS_GATEWAYS) })
+  const server = createAppServer({ probes, ...(payments ? { wrap: payments.wrap, paymentStatus: payments.status } : {}), ...(closedReason === undefined ? {} : { closedReason }) })
   server.listen(PORT, () => console.log(`jarawork-concordium listening on :${PORT} (${NETWORK})`))
 
   // Render sends SIGTERM on redeploy; close cleanly instead of dropping requests.

@@ -2,7 +2,7 @@
  * Judge demo: the whole flow against the PUBLIC validator service on Concordium testnet.
  *
  *   node scripts/judge-demo.ts          verify the validator from the registry only (free, safe)
- *   node scripts/judge-demo.ts --pay    also run three demo orders: verify, pay over x402, get a verdict, decide
+ *   node scripts/judge-demo.ts --pay    also run four demo orders: verify, pay over x402, get a verdict, decide
  *
  * --pay needs a funded Concordium TESTNET account of your own:
  *   CCD_PAYER_ADDRESS and CCD_PAYER_PRIVATE_KEY in concordium/.env (get test CCD from the Concordium faucet).
@@ -56,7 +56,7 @@ say(`            endpoint the card vouches for: ${verified.validator.endpoint}`)
 say(`            payee read from the registry:  ${verified.validator.wallet}`)
 if (!PAY) {
   say()
-  say('Verify-only run finished. Add --pay to run three demo orders (needs your own testnet account).')
+  say('Verify-only run finished. Add --pay to run four demo orders (needs your own testnet account).')
   process.exit(0)
 }
 
@@ -96,12 +96,13 @@ const store = new StubOrderStore([
   { key: 'A', orderRef: `demo-${stamp}-a`, amountDisplay: '25 USDC (display only)', proof: proof('tracking', '1Z999AA10123456784', 'UPS'), status: 'Delivered' },
   { key: 'B', orderRef: `demo-${stamp}-b`, amountDisplay: '40 USDC (display only)', proof: proof('tracking', 'RR123456784US', 'Other'), status: 'Delivered' },
   { key: 'C', orderRef: `demo-${stamp}-c`, amountDisplay: '15 USDC (display only)', proof: proof('text', 'Left it with the neighbour'), status: 'Delivered' },
+  { key: 'D', orderRef: `demo-${stamp}-d`, amountDisplay: '60 USDC (display only)', proof: proof('url', 'https://example.com/'), status: 'Delivered' },
 ])
-const expected: Record<string, string> = { A: 'release (valid UPS number)', B: 'flag (bad check digit)', C: 'flag (free text is never verified)' }
+const expected: Record<string, string> = { A: 'release (valid UPS number)', B: 'flag (bad check digit)', C: 'flag (free text is never verified)', D: 'release (the link really responds: a REAL network check)' }
 const who = [PAYER, verified.validator.wallet, SPONSOR]
 const before = await readBalances(chain, who)
 
-say('\nSTEP 2  Three delivered orders, each: re-verify, pay over x402, get a verdict, decide')
+say('\nSTEP 2  Four delivered orders, each: re-verify, pay over x402, get a verdict, decide')
 const deps: DecideDeps = { badge: BADGE, verify, payerFor, paidLog: new PaidLog(join(paths.data, 'judge-paid.jsonl')), demoMode: true }
 const decisions = await sweep(store, deps)
 for (const d of decisions) {
@@ -117,6 +118,6 @@ say('\nSTEP 3  Who paid what (from the chain, testnet CCD)')
 say(`  buyer paid       ${micro(before[PAYER] - after[PAYER])}   (the price, no fee)`)
 say(`  validator earned ${micro(after[verified.validator.wallet] - before[verified.validator.wallet])}`)
 say(`  sponsor paid     ${micro(before[SPONSOR] - after[SPONSOR])}   (the network fees)`)
-say('\nNote: in this demo the carrier, link and IPFS lookups are simulated stubs and every verdict says so.')
+say('\nNote: the carrier lookup is a simulated stub and says so. The link check (order D) is a real request to the real internet.')
 for (const buyer of opened) await buyer.close()
 process.exit(0)

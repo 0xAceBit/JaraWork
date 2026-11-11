@@ -60,9 +60,9 @@
     <section class="card">
       <h2>What it checks</h2>
       <ul>
-        <li>Links: secure, public web addresses only</li>
-        <li>IPFS hashes: well-formed content identifiers</li>
-        <li>Tracking numbers: format only. It does not confirm delivery</li>
+        <li>Links: a real request checks that a secure, public address responds. Internal addresses are refused. It does not confirm what the page shows</li>
+        <li>IPFS hashes: well-formed identifiers, then a real retrieval through public gateways, which often rate-limit servers (then it answers "try later" and is not charged)</li>
+        <li>Tracking numbers: format checked for real; carrier status is a simulated stub and says so</li>
         <li>Free text: never auto-approved</li>
       </ul>
     </section>
