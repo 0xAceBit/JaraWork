@@ -15,6 +15,7 @@ import { hostedValidatorRegistry } from '../src/buyer/registry.ts'
 import { sweep, type DecideDeps, type Payer } from '../src/buyer/decide.ts'
 import { StubOrderStore } from '../src/buyer/orderStore.ts'
 import { PaidLog } from '../src/buyer/paidLog.ts'
+import { cachedVerifier } from '../src/buyer/verifyCache.ts'
 import { verifyValidator } from '../src/buyer/verifyValidator.ts'
 import { readBalances } from '../src/payments/accounting.ts'
 import { createBuyer } from '../src/payments/buyer.ts'
@@ -38,6 +39,9 @@ async function fetchCard(uri: string): Promise<Uint8Array> {
 const verify = (badge: string) =>
   verifyValidator(badge, { registry: hostedValidatorRegistry(), trustedRegistry: TESTNET_REGISTRY, serviceUrl: SERVICE, fetchCard })
 
+// One successful verification is reused for the run, so four orders do not make 24 registry calls.
+const verifyOnce = cachedVerifier(verify)
+
 const say = (line = ''): void => console.log(line)
 say('JaraWork Proof Validator: judge demo (Concordium testnet)')
 say(`  service  ${SERVICE}`)
@@ -46,7 +50,7 @@ say()
 
 // Step 1: is this validator who it says it is? (registry, active status, card hash, endpoint, payee)
 say('STEP 1  Verify the validator from the registry (nothing is paid)')
-const verified = await verify(BADGE)
+const verified = await verifyOnce(BADGE)
 if (!verified.ok) {
   say(`  REFUSED  ${verified.code}: ${verified.reason}`)
   process.exit(1)
@@ -103,7 +107,7 @@ const who = [PAYER, verified.validator.wallet, SPONSOR]
 const before = await readBalances(chain, who)
 
 say('\nSTEP 2  Four delivered orders, each: re-verify, pay over x402, get a verdict, decide')
-const deps: DecideDeps = { badge: BADGE, verify, payerFor, paidLog: new PaidLog(join(paths.data, 'judge-paid.jsonl')), demoMode: true }
+const deps: DecideDeps = { badge: BADGE, verify: verifyOnce, payerFor, paidLog: new PaidLog(join(paths.data, 'judge-paid.jsonl')), demoMode: true }
 const decisions = await sweep(store, deps)
 for (const d of decisions) {
   say(`\n  Order ${d.orderKey}  expected: ${expected[d.orderKey]}`)

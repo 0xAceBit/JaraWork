@@ -1,0 +1,41 @@
+JaraWork Proof Validator: judge demo (Concordium testnet)
+  service  https://jarawork-agent.onrender.com/mcp
+  badge    JyP9YR6Wk3YPaGx3e8zyu
+
+STEP 1  Verify the validator from the registry (nothing is paid)
+  VERIFIED  registered agent, active, card hash matches the chain
+            endpoint the card vouches for: https://jarawork-agent.onrender.com/mcp
+            payee read from the registry:  47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk
+
+STEP 2  Four delivered orders, each: re-verify, pay over x402, get a verdict, decide
+          buyer approved the terms: 7500000 microCCD to the registry wallet
+          buyer approved the terms: 7500000 microCCD to the registry wallet
+          buyer approved the terms: 7500000 microCCD to the registry wallet
+          buyer approved the terms: 7500000 microCCD to the registry wallet
+
+  Order A  expected: release (valid UPS number)
+    decision   RELEASE_NOW  (VALIDATED)
+    reason     The carrier reports this parcel as delivered. This answer comes from a simulated lookup, not a real one.
+    evidence   84d7a732979566bd...   paid calls: 1   payment tx: 144c7255403190f5e624151bf2461e7e644adefe5a6a6649f3869df0a56d6507
+
+  Order B  expected: flag (bad check digit)
+    decision   FLAG_FOR_REVIEW  (INVALID_FORMAT)
+    reason     Postal (UPU S10) tracking number has an invalid check digit.
+    evidence   13f3cab89c1e7bb6...   paid calls: 1   payment tx: 3effa1bfae364a0acb5559ff2e6c80e9986f9c3117d3ca8314034d8221bddf5a
+
+  Order C  expected: flag (free text is never verified)
+    decision   FLAG_FOR_REVIEW  (NOT_VERIFIABLE)
+    reason     Free text cannot be verified by a machine. It needs a human reviewer.
+    evidence   74f5941f2eb361a6...   paid calls: 1   payment tx: 32fa3919a91522ae4c30f4df7babb97d63fbe1e28c39d1665f448acb942e6ec4
+
+  Order D  expected: release (the link really responds: a REAL network check)
+    decision   RELEASE_NOW  (VALIDATED)
+    reason     The link is well formed and responds. This does not confirm what it shows.
+    evidence   67489d1c23ae6d7c...   paid calls: 1   payment tx: a372018daf4956fbde2bbbed5b0fb44f5ff638507e31932e75c7658062c4cfd0
+
+STEP 3  Who paid what (from the chain, testnet CCD)
+  buyer paid       30.000000 CCD   (the price, no fee)
+  validator earned 30.000000 CCD
+  sponsor paid     17.714588 CCD   (the network fees)
+
+Note: the carrier lookup is a simulated stub and says so. The link check (order D) is a real request to the real internet.
