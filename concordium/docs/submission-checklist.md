@@ -7,6 +7,7 @@
 - Agent: registry token 1008, token address `JyP9YR6Wk3YPaGx3e8zyu`, CIS-8004 registry contract 12802,0 on testnet, owner `47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk`
 - Transactions (search the hash on https://testnet.ccdscan.io): registration `2b829c80ed1a1bce963fd31772671f62f7adb362f6759ea7aec5376f3486c336`, latest card pin `73ab7ad41abd885417bb4ff076862a518cef15c3e44ae1a1136831ea4d8912f9`
 - Paid verdicts from the recorded live run: see `trajectory/judge-demo-2026-11-17.txt` (four payment hashes and the fee split)
+- Every cited transaction, checked against the chain by anyone with no key: `node scripts/verify-evidence.ts` (reads `trajectory/evidence.json`)
 - Run logs: `trajectory/` (one file per working session) and `trajectory/x402/` (end-to-end test logs)
 - Honest self-review: `docs/09-judge-review.md`; integration notes: `docs/integration-map.md`; diagrams: `docs/architecture.md`
 
@@ -21,7 +22,7 @@
 - [ ] Decide the keep-alive: a sleeping free service fails the registry's card check until it wakes.
 - [ ] Confirm on Render: `X402_ALLOW_EPHEMERAL_LEDGER=true` and the sponsor key are set, and `X402_MODE` is not `free`.
 - [ ] Open https://jarawork-agent.onrender.com/x402/status and check it shows `"mode":"paid"`.
-- [ ] Record the video from `docs/demo-video-script.md`.
+- [ ] Record the 3-minute video from `docs/demo-video-script.md` (every command in it was run on 2026-11-17 and needs no key).
 - [ ] View `docs/architecture.md` on GitHub and check both diagrams render.
 - [ ] Add a licence file if the rules require one.
 - [ ] Run the secret check below and confirm it prints zeros.

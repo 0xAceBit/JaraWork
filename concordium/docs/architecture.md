@@ -1,79 +1,112 @@
 # Architecture
 
-## The pieces
+Everything drawn here exists in the code. A dotted line marked "not connected" is a gap, not a feature. File paths are in the node labels. The README's "Safety rules enforced in code" table lists the tests.
+
+## Components
 
 ```mermaid
 flowchart LR
-  subgraph arc["Arc: JaraWork escrow (unchanged, not connected yet)"]
-    escrow["Escrow agent<br/>releases on a timer"]
+  subgraph orders["Orders (a stub, no escrow)"]
+    store["Stub order store<br/>src/buyer/orderStore.ts"]
   end
 
-  subgraph buyer["Node buyer (this repo, src/buyer)"]
-    verify["verifyValidator<br/>5 registry checks"] --> payer["x402 payer<br/>spend caps, payee check"] --> decide["release decision<br/>release / flag / defer"]
+  subgraph buyer["Node buyer"]
+    decide["Release decision<br/>src/buyer/decide.ts<br/>src/buyer/releasePolicy.ts"]
+    verify["verifyValidator<br/>src/buyer/verifyValidator.ts"]
+    pay["Payment policy and caps<br/>src/payments/buyer.ts"]
+  end
+
+  subgraph service["Validator service (server.mjs)"]
+    mcp["MCP tool validate_delivery_proof<br/>src/service/mcp.ts"]
+    wrap["x402 paywall, ledger, replay and caps<br/>src/payments/paymentContext.ts"]
+    checks["Checks<br/>src/service/validate.ts"]
+    fac["Facilitator, in process<br/>src/payments/facilitator.ts"]
+    card["Agent Card, exact bytes<br/>public/agent-card.json"]
   end
 
   subgraph ccd["Concordium testnet"]
-    registry["Agent Registry<br/>CIS-8004 token 1008"]
-    chain["Sponsored CCD payment<br/>buyer pays price, sponsor pays fee"]
+    hosted["Hosted registry service (MCP)"]
+    reg["Agent Registry, CIS-8004<br/>contract 12802,0"]
+    chain["Sponsored CCD transfer"]
   end
 
-  subgraph svc["Proof Validator service (Render, src/service)"]
-    card["Agent Card<br/>hash pinned on chain"]
-    tool["MCP tool<br/>validate_delivery_proof"]
-    fac["Facilitator<br/>verifies and settles"]
+  subgraph net["Public internet"]
+    links["Links and IPFS gateways"]
   end
 
-  verify --> registry
-  verify --> card
-  payer --> tool
-  tool --> fac --> chain
-  decide -. "stub order store only" .-> escrow
+  store --> decide
+  decide --> verify
+  verify --> hosted
+  hosted --> reg
+  verify -. "fetch card, compare hash with the chain" .-> card
+  decide --> pay
+  pay -. "re-read payee wallet" .-> hosted
+  pay --> mcp
+  mcp --> wrap
+  wrap --> checks
+  checks --> links
+  wrap --> fac
+  fac --> chain
+  decide -. "not connected: no Arc escrow" .-> arc["JaraWork escrow on Arc"]
 ```
 
-The dashed line is the honest gap: the decision logic exists and is tested, but it runs against a stub order store. Nothing here touches the JaraWork escrow or any mainnet.
+What is simulated: the carrier delivery status inside `checks` (`src/service/probes.ts`). Everything else on the diagram is real code and ran against testnet.
 
 ## One decision, step by step
 
 ```mermaid
 sequenceDiagram
-  participant B as Buyer
-  participant R as Concordium registry
-  participant V as Validator service
-  participant C as Concordium chain
+  autonumber
+  participant B as Buyer (Node)
+  participant H as Hosted registry service
+  participant S as Validator service
+  participant F as Facilitator (inside S)
+  participant C as Concordium testnet
 
-  B->>R: badge exists, agent active, card hash equals chain
-  B->>V: fetch the Agent Card and hash it
-  B->>B: card lists the endpoint I am about to call
-  B->>R: payee wallet (read from the registry, never from the card)
-  B->>V: call validate_delivery_proof, no payment
-  V-->>B: payment required: 7.5 CCD to the registry wallet
-  B->>R: re-read the payee, check price cap and fee payer
-  B->>V: same call with a signed payment
-  V->>C: verify, run the checks, then settle (sponsor co-signs and pays the fee)
-  V-->>B: verdict, reason, evidence hash
-  B->>B: recompute the evidence hash from my own proof
-  B->>B: decide: release now, flag for review, or defer to the timer
+  B->>H: parse the badge, look up the agent, is it active
+  B->>S: fetch the Agent Card and hash it, compare with the chain
+  B->>S: call the tool, no payment
+  S-->>B: payment requirements (price, payee, fee payer)
+  B->>H: read the payee wallet again
+  B->>S: call the tool with a signed payment
+  S->>F: verify the payment (signature, balance, expiry)
+  S->>S: run the checks
+  alt it is an answer
+    S->>F: settle
+    F->>C: sponsor co-signs, submits and pays the fee
+    S-->>B: verdict and evidence hash
+  else malformed input or inconclusive
+    S-->>B: verdict marked as an error, payment cancelled, no charge
+  end
+  B->>B: recheck proof hash, order reference and evidence hash
+  B->>B: release policy chooses release, flag or defer
 ```
 
-## What is real and what is simulated
+## How a verdict becomes a decision
 
-| Part | Status |
-| --- | --- |
-| Agent registration, badge, pinned card hash | Real, on Concordium testnet |
-| Sponsored x402 payment, fee split from the chain | Real, on Concordium testnet |
-| Payee read from the registry, hostile-buyer refusals | Real |
-| Link check (guarded request, internal addresses refused) | Real network request |
-| IPFS retrieval through public gateways | Real, but public gateways often rate-limit servers ("try later", not charged) |
-| Carrier delivery status | Simulated stub, and every such verdict says so. Because only a REAL carrier confirmation may release funds, nothing releases early outside demo mode today |
-| Order store and the Arc escrow link | Stub; not connected |
+```mermaid
+flowchart TD
+  v["Verified verdict"] --> t{"Free text?"}
+  t -- "yes" --> flag["FLAG_FOR_REVIEW"]
+  t -- "no" --> p{"Did it pass?"}
+  p -- "no, definite" --> flag
+  p -- "no, retryable" --> defer1["DEFER_TO_TIMER"]
+  p -- "yes" --> c{"Which evidence?"}
+  c -- "real carrier confirmation" --> release["RELEASE_NOW"]
+  c -- "simulated carrier confirmation" --> m{"Demo mode?"}
+  m -- "yes" --> release
+  m -- "no" --> defer2["DEFER_TO_TIMER"]
+  c -- "a link responds or a file exists" --> defer3["DEFER_TO_TIMER, availability only"]
+```
 
-## Safety properties that are tested
+Today carrier status is simulated, so outside demo mode nothing reaches `RELEASE_NOW`. An unverifiable validator, a refused payment, a failed call or a verdict that does not match its proof also defer (`src/buyer/decide.ts`).
 
-- A verdict can only be fetched again by the payer who paid, with a payment whose signature verifies, once.
-- Malformed input and inconclusive checks are answered but not charged.
-- The buyer releases funds only on real evidence of delivery. A link that responds or a file that can be retrieved proves existence, so it is paid for but not released on (unless the operator opts in).
-- A refused or unverifiable validator is never paid: the order falls back to the existing timer.
-- The buyer never pays an address the server or the card names; it pays what the registry says.
-- Free work is limited: payment-bearing calls, unpaid calls and the free preview have separate rate budgets; a verified payer that keeps asking for uncharged answers is refused for a while; outbound checks are capped at 8 at a time.
-- Restart safety is explicit: the server's ledger must be declared durable (and the claim is checked) or accepted as ephemeral, and the buyer's paid log and spend log are required arguments.
-- Server fetches refuse internal addresses, re-check every redirect, and connect only to the address they checked.
+## Trust boundaries
+
+| Boundary | What crosses it | Control |
+| --- | --- | --- |
+| Buyer to validator service | A signed payment and a proof | The payee comes from the registry, caps and a payment policy apply (`src/payments/buyer.ts`). |
+| Validator service to the public internet | Requests to links and IPFS gateways named by a stranger | Public addresses only, a pinned connection, re-checked redirects (`src/service/realProbes.ts`). |
+| Anyone to the service | Unpaid calls, payment-bearing calls, the free preview | Three separate rate budgets (`src/service/admission.ts`). |
+| Service to Concordium | Reads, and a sponsored transfer | The sponsor key is an environment variable (`src/payments/config.ts`). |
+| This module to the real escrow | Nothing | The stub store refuses to start near mainnet settings (`src/buyer/orderStore.ts`). |

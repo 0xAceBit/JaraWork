@@ -1,33 +1,75 @@
-# Demo video script (about 4 minutes)
+# 3-minute demo
 
-I cannot record the video for you, so this is the shot list, the words and the exact commands.
+Every command and every expected output below comes from a real run on 2026-11-17. Nothing here needs a key, an account or any test CCD.
 
-## Before you press record
-- Wake the service: open https://jarawork-agent.onrender.com/health once (the free tier sleeps; first load takes about a minute).
-- Use a throwaway testnet account that holds a little test CCD. Never show `concordium/.env` or any key on screen.
-- Terminal font large, window about 100 columns wide. Close other tabs.
-- Have these open in tabs: the service page, the registry check URL, the GitHub repo.
+## Before recording
 
-## Shots
+1. `cd concordium && npm install`, once.
+2. Wake the free-tier host so nothing waits during the take: `curl -s https://jarawork-agent.onrender.com/health`
+3. Terminal font large. Do not open `concordium/.env`, and do not show any private key.
+4. Say only what the demo shows. Carrier delivery status is simulated, and the demo says so.
 
-| Time | On screen | Say |
+## Script
+
+| Time | On screen | What you say |
 | --- | --- | --- |
-| 0:00 | JaraWork main site, then the service page | "JaraWork pays workers when an order is delivered. Today the payment releases on a timer and nobody reads the proof. This agent is a trusted second opinion in front of that release." |
-| 0:25 | Service page, free preview: click "valid UPS number", then "bad check digit" | "Anyone can try the format rules here for free. It tells you what it did not check, so it cannot be mistaken for the real paid answer." |
-| 0:50 | Registry check URL in the browser: `badge_valid: true` | "This is Concordium's own registry saying the agent is registered, active and verified, and that its card matches what is pinned on chain." |
-| 1:10 | Terminal: `node scripts/judge-demo.ts` | "A buyer never takes the validator's word. It checks the registry, hashes the card itself, confirms the endpoint, and reads the payee from the registry, not from the card." Point at VERIFIED. |
-| 1:40 | Terminal: `node scripts/judge-demo.ts --pay` (cut the waiting) | "Four delivered orders. For each one: verify, pay over x402, get a verdict, decide." Point at each decision and its reason. Order A releases (demo mode, simulated carrier). B and C are flagged. **D is the important one:** the link really responds, the buyer pays for that answer, and it still does NOT release: "a page that exists is not proof of delivery". |
-| 2:40 | The "Who paid what" block | "The buyer paid the price and no fee. The sponsor paid the network fee. These numbers come from the chain, not from us." |
-| 3:00 | Terminal: `node --test $(grep -o 'test/[a-zA-Z.]*test.ts' package.json)` | "Over two hundred tests, including attacks: a forged payment, a replayed payment, a link that points at an internal address. All refused." |
-| 3:25 | `docs/09-judge-review.md` | "We reviewed our own work like a judge, found 15 problems, and fixed the serious ones. The list is public." |
-| 3:40 | `docs/architecture.md` diagram | "What is real and what is simulated is labelled. Carrier status is still a stub. The Arc escrow is not connected yet. That is the next step." |
-| 3:55 | Repo link, service link | "Everything is testnet, open source, and verifiable." |
+| 0:00 | The service page, https://jarawork-agent.onrender.com | "JaraWork releases a worker's payment after a timer without looking at the proof. This agent is a paid second opinion in front of that release. It runs on Concordium testnet." |
+| 0:20 | In the page's free preview, click the sample "bad check digit" (it fills in `RR123456784US` and checks it), then the sample "valid UPS number". | "This preview is free and checks the format only. The bad check digit is caught. It never returns the paid verdict." |
+| 0:50 | Terminal, command 1 below | "This is Concordium's own registry, not ours. The agent is registered, the badge is valid, and the card we serve hashes to what is on chain." |
+| 1:20 | Terminal, command 2 below | "Before a buyer pays, it verifies the validator itself: registered, active, card hash equals the chain, the card lists this endpoint, and it reads the payee wallet from the registry." |
+| 1:50 | Terminal, command 3 below | "Calling the tool without paying returns a price, not a verdict: 7.5 test CCD, to the registry's wallet, with a separate sponsor account paying the network fee." |
+| 2:10 | Terminal, command 4 below | "This is a recorded paid run of four orders. A is released, B and C are flagged, and D is deferred. D's link really responded, but a page that exists is not proof of delivery, so the buyer will not release funds on it." |
+| 2:40 | Terminal, command 5 below | "Every transaction we cite is checked against the chain: who sent it, who received it, and who paid the fee. The buyer paid no fee, the sponsor did." |
+| 2:55 | The README's "Path to production" heading | "Today the carrier lookup is simulated, so nothing releases early outside demo mode. The path to production lists what is missing." |
 
-## Commands, in order
+## Commands
+
 ```
-cd concordium
+# 1. Concordium's registry check, independent of us
+curl -s https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu
+```
+Expected: `"badge_valid": true` and `"issues": []`. About 0.6 seconds.
+
+```
+# 2. Verify the validator from the registry, paying nothing
 node scripts/judge-demo.ts
-node scripts/judge-demo.ts --pay
-node --test $(grep -o 'test/[a-zA-Z.]*test.ts' package.json)
 ```
-`--pay` needs `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env` for a funded testnet account.
+Expected:
+```
+STEP 1  Verify the validator from the registry (nothing is paid)
+  VERIFIED  registered agent, active, card hash matches the chain
+            endpoint the card vouches for: https://jarawork-agent.onrender.com/mcp
+            payee read from the registry:  47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk
+```
+About 2.4 seconds.
+
+```
+# 3. The paid tool, called without paying: it answers with the price
+curl -s https://jarawork-agent.onrender.com/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_delivery_proof","arguments":{"proof":"{\"type\":\"tracking\",\"value\":\"1Z999AA10123456784\",\"carrier\":\"UPS\"}"}}}'
+```
+Expected: an error result whose body asks for payment: scheme `exact`, network `ccd:4221332d34e1694168c2a0c0b3fd0f27`, asset `CCD`, amount `7500000`, `payTo` the registry wallet `47rTdQ...`, fee payer `3EZWRp...`. It is long raw JSON, so for the recording pipe it through a formatter or just point at those fields.
+
+```
+# 4. The recorded paid run: the decisions, then who paid what
+sed -n '/^STEP 2/,/^STEP 3/p' trajectory/judge-demo-2026-11-17.txt | grep -E "Order|decision|reason"
+sed -n '/^STEP 3/,$p' trajectory/judge-demo-2026-11-17.txt | head -5
+```
+Expected: orders A `RELEASE_NOW`, B `FLAG_FOR_REVIEW`, C `FLAG_FOR_REVIEW`, D `DEFER_TO_TIMER (AVAILABILITY_ONLY)`, then buyer paid 30.000000 CCD (the price, no fee), validator earned 30.000000 CCD, sponsor paid 18.318916 CCD (the network fees).
+
+```
+# 5. Check every cited transaction against the chain
+node scripts/verify-evidence.ts
+```
+Expected: six `OK` lines, each showing the sender, the recipient, 7500000 microCCD for the four payments, and the sponsor's fee, then `All transactions match what the docs say.` About 1.2 seconds.
+
+## If you have time
+
+- `npm test` runs the offline tests in about 2 seconds and should end with no failures.
+- To run the paid flow live instead of showing the recording, use `node scripts/judge-demo.ts --pay`. It needs your own testnet account (see the README) and takes about two minutes, which does not fit a three-minute take.
+
+## Limits to state out loud
+
+- Carrier delivery status is simulated. Every such verdict says so.
+- A link that responds or an IPFS file that exists shows availability only.
+- This module is not connected to the JaraWork escrow on Arc.
+- The public service's payment memory resets when it restarts.

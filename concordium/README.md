@@ -1,187 +1,193 @@
-# JaraWork Proof Validator (Concordium hackathon module)
+# JaraWork Proof Validator (Concordium testnet)
 
-A validator service for JaraWork delivery proofs, built for the Concordium Trusted Agents hackathon. Testnet only.
+An agent that checks the delivery proof a worker submits for an escrow order and answers pass or fail, with a short reason and a hash of the evidence it examined. It is paid per call over x402 in testnet CCD. It is registered in Concordium's Agent Registry with a valid badge, and a Node "buyer" verifies it from the registry before paying it. It is a module for the Concordium Trusted Agents hackathon, it runs on testnet only, and it is **not connected** to the JaraWork escrow on Arc.
 
 Built with [Arc Studio](https://studio.arc.io)
 
-## For judges: the 3-minute version
+Every statement here points at the file that implements it, a test, or a recorded log. A statement without one is not made. `npm test` fails if this README names a file, route, tool or setting that does not exist ([test/docs.test.ts](test/docs.test.ts)).
 
-**What it is.** A registered, badge-verified Concordium agent that checks the proof a worker submits for a JaraWork escrow order (a tracking number, a link, an IPFS hash) and answers pass or fail with a reason and an evidence hash. It is paid per call over x402 with fees sponsored, and a Node buyer verifies the agent from the registry before it pays anything.
+## Try it in 3 minutes, no account needed
 
-**Why it matters.** JaraWork today releases a worker's payment after a timer without reading the proof. This agent is a trusted second opinion in front of that release: release early, flag, or fall back to the timer. Its identity, price and payee are publicly verifiable on Concordium instead of taken on faith.
+The timed script with expected output is [docs/demo-video-script.md](docs/demo-video-script.md). The commands, run from this folder after `npm install`:
 
-**Verify it yourself in three minutes (free, no account):**
-1. Open Concordium's own check: https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu and look for `badge_valid: true`.
-2. Open https://jarawork-agent.onrender.com and try the free format preview.
-3. Run `cd concordium && npm install` once (Node 22 or later), then `node scripts/judge-demo.ts`: it verifies the validator from the registry (registered, active, card hash equals the chain, endpoint, payee). Add `--pay` with your own testnet account to run four orders end to end.
+```
+curl -s https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu   # Concordium's own check: badge_valid true
+node scripts/judge-demo.ts                                                                  # buyer verifies the validator from the registry, pays nothing
+node scripts/verify-evidence.ts                                                             # asks the chain about every transaction cited in this repo
+```
 
-**What is real:** the registration and badge, the sponsored x402 payments with the fee split read from the chain, the payee taken from the registry, the buyer's refusals, and the link check (a guarded request). **What is simulated, and says so in every answer:** carrier delivery status. **What the buyer will not do:** release funds because a link responds or a file exists. **What is not connected yet:** the Arc escrow (orders are a stub store). Details and diagrams: [docs/architecture.md](docs/architecture.md).
-
-**Evidence:** registry token 1008 on testnet; registration `2b829c80…c336`; four paid verdicts in [trajectory/judge-demo-2026-11-17.txt](trajectory/judge-demo-2026-11-17.txt); a 22-check live end-to-end log in `trajectory/x402/`; 230+ tests; two public self-reviews written as a hostile judge: [docs/09-judge-review.md](docs/09-judge-review.md) (15 findings, 8 fixed or partly fixed) and [docs/10-second-review.md](docs/10-second-review.md) (14 more, with what was fixed and what remains open). Submission list: [docs/submission-checklist.md](docs/submission-checklist.md). Video script: [docs/demo-video-script.md](docs/demo-video-script.md).
-
-**Path to production (not built, written down):** key custody in a managed secrets service with separate owner, payee and sponsor keys; validator reputation and signed verdicts; a dispute path; mainnet configuration; and reconciliation between the Arc escrow (USDC) and the Concordium payment (CCD). See the last section of the review.
-
-This module lives on the `concordium-hackathon` branch and is not part of the live JaraWork app. Do not merge it to `main` until it has been tested.
+The service page, with a free format-only preview, is https://jarawork-agent.onrender.com. To run the paid flow yourself, see "Run it on Node".
 
 ## What it does
 
-`validate_delivery_proof` takes the proof a worker submits and returns pass or fail with a reason. It understands three kinds of proof:
+The tool is `validate_delivery_proof` ([src/service/mcp.ts](src/service/mcp.ts)). Its input is the proof string stored on the order: a JSON object with a `type` of `tracking`, `url`, `ipfs` or `text` ([src/service/envelope.ts](src/service/envelope.ts)). The logic is in [src/service/validate.ts](src/service/validate.ts).
 
-- **URLs:** a guarded request checks that a secure, public address responds. Internal, local and IP-address links are refused.
-- **IPFS content IDs:** CIDv0 and CIDv1 (sha2-256), bare, as `ipfs://`, or inside a gateway link; then retrieval is attempted through public gateways.
-- **Tracking numbers:** UPU postal numbers (check digit verified), UPS-style numbers, and common digit-only carrier formats. Carrier delivery status is a simulated stub.
+| Proof | What is checked | Real or simulated | Code |
+| --- | --- | --- | --- |
+| tracking | Format rules: postal (UPU S10) numbers with their check digit, UPS-style numbers, common digit-only lengths. Then the carrier's delivery status. | Format is real. **Carrier status is simulated** from fixed fixtures. | [src/validator/tracking.ts](src/validator/tracking.ts), [src/service/probes.ts](src/service/probes.ts) |
+| url | https only, port 443, public host names. Then a guarded request confirms the address responds. | Real. A pass means the address responds, nothing more. | [src/validator/url.ts](src/validator/url.ts), [src/service/realProbes.ts](src/service/realProbes.ts) |
+| ipfs | Content identifier structure (v0 and v1). Then retrieval through public gateways. | Real, but public gateways often answer 429, which is reported as unavailable. | [src/validator/ipfs.ts](src/validator/ipfs.ts), [src/service/realProbes.ts](src/service/realProbes.ts) |
+| text | Never passes. | Real. | [src/service/validate.ts](src/service/validate.ts) |
 
-Current limits, stated plainly:
-- A responding link proves a page exists, not that anything was delivered. An IPFS file that can be retrieved proves a file exists. A worker can point at any live page or any pinned file.
-- So the **buyer** does not release funds on either. Only a real carrier confirmation may release funds, and carrier status is still simulated, which means **outside demo mode nothing is released early today**: orders fall back to the timer or go to a human. This is deliberate and tested (`src/buyer/releasePolicy.ts`).
-- Public IPFS gateways rate-limit shared servers, so retrieval is often "unavailable, try later" (not charged).
+The answer has `verdict` (pass or fail), `code`, `reason` (at most 200 characters, from fixed templates, never the raw proof), `retryable`, `simulated`, `checks`, `evidenceHash` (a SHA-256 over the evidence examined, see [src/service/evidence.ts](src/service/evidence.ts)), `proofSha256` and `orderRef` ([src/service/types.ts](src/service/types.ts)). The evidence hash shows a verdict is consistent with its evidence. It is not a signature.
 
-## Tech stack
+**Payment.** The price defaults to 7,500,000 microCCD, which is 1.5 times the estimated sponsor fee ([src/payments/config.ts](src/payments/config.ts)). A caller is charged only for an answer: malformed input and inconclusive (retryable) results come back marked as errors, which cancels the payment ([src/payments/chargeability.ts](src/payments/chargeability.ts), [src/payments/paymentContext.ts](src/payments/paymentContext.ts)).
 
-Node.js 22 or later, plain ES modules and TypeScript run directly by Node, `@concordium/web-sdk` for Concordium access.
+**The buyer** ([src/buyer/](src/buyer/)) acts for an escrow. Before it pays anything it runs [src/buyer/verifyValidator.ts](src/buyer/verifyValidator.ts): the badge parses, the agent exists in the trusted registry, it is active, its card hashes to the on-chain hash (the registry's check and the buyer's own fetch), the card lists the MCP endpoint being called, and the registry has a payee wallet. The payment policy ([src/payments/buyer.ts](src/payments/buyer.ts)) then pays only the wallet the registry returns, on the expected network, in CCD, within its caps. The verdict is accepted only if its proof hash, order reference and recomputed evidence hash match ([src/buyer/decide.ts](src/buyer/decide.ts)).
 
-## Development
+**The release decision** is `RELEASE_NOW`, `FLAG_FOR_REVIEW` or `DEFER_TO_TIMER`. Only a real carrier confirmation releases funds. A simulated confirmation releases only in demo mode. A link that responds or a file that exists defers, because that shows availability, not delivery ([src/buyer/releasePolicy.ts](src/buyer/releasePolicy.ts)). Today carrier status is simulated, so **nothing releases early outside demo mode**.
 
-Prerequisite: Node.js 22 or later.
+## How each Concordium component is used
 
-```bash
+| Component | What it is used for here | Code | Proof |
+| --- | --- | --- | --- |
+| Agent Registry (CIS-8004 contract on testnet, index 12802, subindex 0) | The validator is registered as token 1008 (address `JyP9YR6Wk3YPaGx3e8zyu`). The buyer trusts only this contract. | Contract id: `TESTNET_REGISTRY` in [src/registry/types.ts](src/registry/types.ts). Registration and re-pin: [scripts/registry/03-build-register.ts](scripts/registry/03-build-register.ts), [scripts/registry/04-sign-submit.ts](scripts/registry/04-sign-submit.ts), [scripts/registry/07-build-set-agent-uri.ts](scripts/registry/07-build-set-agent-uri.ts) | [trajectory/evidence.json](trajectory/evidence.json), checked by `node scripts/verify-evidence.ts` |
+| Agent Card and Verified badge | The card lists the MCP endpoint and `x402Support`, and carries the badge. It is served byte for byte and its SHA-256 is pinned on chain. | [public/agent-card.json](public/agent-card.json), the `/.well-known/agent-card.json` route in [server.mjs](server.mjs), built by [scripts/registry/01-build-card.ts](scripts/registry/01-build-card.ts), [scripts/registry/06-build-badge.ts](scripts/registry/06-build-badge.ts), [scripts/registry/10-update-card.ts](scripts/registry/10-update-card.ts) | The registry's own check above. A test pins the card hash ([test/service.mcp.test.ts](test/service.mcp.test.ts)). |
+| Concordium's hosted registry service (MCP) | Every registry read, and the builders that produce unsigned registry transactions. Reads used at run time: `parse_token_address`, `agent_by_token_address`, `agent_of`, `is_active`, `verify_agent_card`, `get_agent_wallet`. | [src/registry/hostedReader.ts](src/registry/hostedReader.ts), [src/buyer/registry.ts](src/buyer/registry.ts), [scripts/registry/lib.ts](scripts/registry/lib.ts) | Every request and response of the registration is in [trajectory/registry/transcript.jsonl](trajectory/registry/transcript.jsonl). |
+| `agentWallet` | The buyer pays the wallet the registry returns, never one the card or the server names. A cleared wallet is refused. | [src/registry/resolvePayee.ts](src/registry/resolvePayee.ts), [src/buyer/verifyValidator.ts](src/buyer/verifyValidator.ts) | [test/resolvePayee.test.ts](test/resolvePayee.test.ts). The script that *sets* a wallet ([scripts/registry/08-set-agent-wallet.ts](scripts/registry/08-set-agent-wallet.ts)) exists but **has never been run on chain**. |
+| x402 `exact` scheme, native CCD (`@x402/concordium` 2.30.0, `@x402/mcp` 2.30.0) | The paywall on the tool, the buyer's payment, and a facilitator that runs inside the service. | [src/payments/paymentContext.ts](src/payments/paymentContext.ts), [src/payments/facilitator.ts](src/payments/facilitator.ts), [src/payments/buyer.ts](src/payments/buyer.ts) | [trajectory/x402/e2e-2026-11-17T13-50-45-895Z.log](trajectory/x402/e2e-2026-11-17T13-50-45-895Z.log) and [trajectory/judge-demo-2026-11-17.txt](trajectory/judge-demo-2026-11-17.txt) |
+| Sponsored transactions | The buyer signs a transfer and a separate sponsor account co-signs and pays the network fee. The fee paid by the sponsor versus the buyer is read from the chain. | [src/payments/accounting.ts](src/payments/accounting.ts) | `node scripts/verify-evidence.ts` prints the sponsor's fee and the buyer's fee (0) for each payment. |
+| Concordium SDK over gRPC (`@concordium/web-sdk` 12.0.2) | Latest block (`/chain`), balances and transaction summaries for the fee record, and signing in the registration scripts. | [server.mjs](server.mjs), [src/payments/accounting.ts](src/payments/accounting.ts), [scripts/registry/04-sign-submit.ts](scripts/registry/04-sign-submit.ts) | [scripts/latest-block.ts](scripts/latest-block.ts) |
+
+**Not used.** No code in this repository uses Concordium's zero-knowledge identity proofs, its protocol-level stablecoins, or any reputation or validation registry. The only asset paid is native CCD. Nothing runs on mainnet.
+
+**Where the fee numbers come from.** The sponsor's fee moves with the chain: it was 4,991,315 microCCD on 2026-11-07 and 4,579,729 on 2026-11-17 ([trajectory/x402/](trajectory/x402/) and [trajectory/evidence.json](trajectory/evidence.json)). The price and caps are fixed settings, so they need re-checking when it moves.
+
+## Run it on Node
+
+Needs Node 22.18 or newer (`engines` in [package.json](package.json)). TypeScript runs directly, so there is no build step.
+
+```
 cd concordium
 npm install
-npm start        # service on :3002: /, /health, /chain, /mcp, /demo/preview, /x402/status, /.well-known/agent-card.json
-npm test         # the whole offline test suite (no network needed)
-npm run smoke    # Concordium SDK check against testnet (read only)
+npm test             # offline tests, no network and no keys needed
+npm run typecheck
 ```
 
-Environment variables (all optional, no secrets needed yet):
+Start the service. With no settings it starts **closed**: it serves the card, `/health` and the page, but `/mcp` answers 503 and `/x402/status` says why ([src/payments/config.ts](src/payments/config.ts)).
 
-- `PORT` or `CONCORDIUM_PORT`: port to listen on (default 3002).
-- `CCD_NETWORK`: label shown by the service (default `testnet`).
-- `CCD_GRPC_HOST`, `CCD_GRPC_PORT`: Concordium node to read from (default `grpc.testnet.concordium.com`, `20000`).
+```
+X402_MODE=free npm start        # free: anyone gets verdicts without paying; for local testing
+```
 
-## Dev preview in Arc Studio
+Paid mode needs the sponsor account's key and an explicit choice about the ledger:
 
-The branch adds a dev-only proxy route `/ccd-svc` in `vite.config.ts` and a small status badge in the preview panel. Neither ships in a production build.
+```
+CCD_FACILITATOR_ADDRESS=<sponsor address> \
+CCD_FACILITATOR_PRIVATE_KEY=<64 hex characters> \
+X402_ALLOW_EPHEMERAL_LEDGER=true \
+npm start
+```
 
-## Deploying as its own Render service
+Put keys in `concordium/.env` (read at start, ignored by git), never in a command line you keep. Use testnet-only accounts.
 
-Keep this separate from the live JaraWork service.
+**Run the full flow yourself.** `node scripts/judge-demo.ts --pay` runs four demo orders against the public service. It needs your own testnet account: put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env` and get test CCD from the Concordium testnet faucet. It checks the key belongs to the address before paying anything. [scripts/x402-e2e.ts](scripts/x402-e2e.ts) runs the service in-process against testnet and makes two real payments of test CCD.
 
-| Setting | Value |
+### Routes
+
+| Route | What it does | Code |
+| --- | --- | --- |
+| `/` | Service page; JSON description for API clients | [server.mjs](server.mjs), [public/index.html](public/index.html) |
+| `/mcp` | The MCP endpoint with `validate_delivery_proof` | [src/service/mcpHttp.ts](src/service/mcpHttp.ts) |
+| `/demo/preview` | Free, offline format preview; never returns the paid verdict | [src/service/preview.ts](src/service/preview.ts) |
+| `/x402/status` | Mode, price, payee, sponsor, whether the ledger is durable | [server.mjs](server.mjs) |
+| `/.well-known/agent-card.json` | The Agent Card, exact bytes | [server.mjs](server.mjs) |
+| `/og-image.svg` | Share-preview image | [server.mjs](server.mjs) |
+| `/health` | Liveness | [server.mjs](server.mjs) |
+| `/chain` | Latest Concordium testnet block, read live | [server.mjs](server.mjs) |
+
+### Settings
+
+Service ([server.mjs](server.mjs), [src/payments/config.ts](src/payments/config.ts)):
+
+| Setting | Meaning (default) |
 | --- | --- |
-| Branch | `concordium-hackathon` (never `main`) |
-| Root Directory | `concordium` |
-| Runtime | Node |
-| Build Command | `npm install` |
-| Start Command | `node server.mjs` |
-| Health Check Path | `/health` |
-| Environment | `NODE_VERSION=22` |
+| `X402_MODE` | `free` serves verdicts without payment. Anything else, including unset, is paid and fails closed. |
+| `CCD_FACILITATOR_ADDRESS` | Public address of the sponsor account (the demo sponsor). |
+| `CCD_FACILITATOR_PRIVATE_KEY` | Sponsor signing key. `CCD_SPONSOR_PRIVATE_KEY` is read as a fallback. |
+| `X402_ALLOW_EPHEMERAL_LEDGER` | `true` accepts that a restart erases the payment memory. |
+| `X402_LEDGER_DURABLE` | `true` declares the ledger is on a persistent disk. The server checks this and refuses if the file is on the container's own filesystem or a RAM disk. |
+| `X402_LEDGER_FILE` | Ledger path (`.data/payments.jsonl`). |
+| `REGISTRY_TOKEN_ADDRESS` | Badge whose registry wallet gets paid (token 1008). |
+| `PRICE_MICRO_CCD` | Price per call (7500000). |
+| `ESTIMATED_SPONSOR_FEE_MICRO` | Fee estimate used for the budget (5000000). |
+| `PAYER_DAILY_MAX_MICRO` | Per payer, per 24 hours (150000000). |
+| `SPONSOR_DAILY_BUDGET_MICRO` | Estimated fees per 24 hours (250000000). |
+| `X402_MAX_TIMEOUT_SECONDS` | How long a signed payment stays valid (60). |
+| `X402_MAX_UNCHARGED_PER_MIN` | Uncharged answers one payer may get per minute (5). |
+| `CCD_GRPC_HOST`, `CCD_GRPC_PORT` | Concordium node (`grpc.testnet.concordium.com`, 20000). |
+| `LIVE_LINK_CHECKS` | `false` swaps the real link and IPFS checks for stubs. |
+| `IPFS_GATEWAYS` | Comma-separated https gateways (`ipfs.io`, `dweb.link`, `w3s.link`). |
+| `RATE_LIMIT_PER_MIN`, `RATE_LIMIT_GLOBAL_PER_MIN` | Unpaid `/mcp` calls, per client and overall (60, 3000). |
+| `PAID_RATE_LIMIT_PER_MIN`, `PAID_RATE_LIMIT_GLOBAL_PER_MIN` | Payment-bearing calls (30, 240). |
+| `PREVIEW_RATE_LIMIT_PER_MIN`, `PREVIEW_RATE_LIMIT_GLOBAL_PER_MIN` | The free preview, with its own budget (30, 300). |
+| `PORT` | Listen port (3002). `CONCORDIUM_PORT` is read as a fallback. |
+| `CCD_NETWORK` | A label shown in `/health`, `/chain` and the start-up line. It does **not** switch networks; the node address does. |
 
-## Isolation rules
+Scripts only:
 
-- Own `package.json` and lockfile. Do not add Concordium dependencies to the root `package.json`.
-- Nothing in `src/`, `server/`, `contracts/` or the root `Dockerfile` carries Concordium logic.
-- Separate env vars and keys from the live app. Never reuse the live Circle credentials.
-- Session history and decisions are logged in `trajectory/`.
+| Setting | Used by |
+| --- | --- |
+| `VALIDATOR_BADGE`, `SERVICE_URL`, `ALLOWED_FEE_PAYER` | [scripts/judge-demo.ts](scripts/judge-demo.ts) (defaults: our badge, our service, our sponsor) |
+| `CCD_PAYER_ADDRESS`, `CCD_PAYER_PRIVATE_KEY` | [scripts/judge-demo.ts](scripts/judge-demo.ts), [scripts/x402-e2e.ts](scripts/x402-e2e.ts) |
+| `CCD_OWNER_ADDRESS`, `CCD_OWNER_PRIVATE_KEY`, `CCD_PAYEE_PRIVATE_KEY`, `PUBLIC_BASE_URL` | the registry scripts in [scripts/registry/](scripts/registry/) |
 
-## Documents
+## Safety rules enforced in code
 
-- `docs/integration-map.md`: what Concordium's docs and live services confirm, what is unverified, and the riskiest assumptions.
-- `docs/01-validator-spec.md`: `validate_delivery_proof` request, response, codes and checks.
-- `docs/02-buyer-flow.md`: the buyer's decision flow before release, and the stub order store.
-- `docs/03-bun-to-node-port.md`: what a port would take, and why we do not port.
-- `docs/04-plan.md`: day-by-day plan to Nov 22 and Dec 9.
-- `docs/05-cut-list-and-scope.md`: cut order and scope-creep challenges.
-- `trajectory/`: a log of every working session.
+| Rule | Code | Test or log |
+| --- | --- | --- |
+| The buyer pays only the wallet the registry returns. A server asking for another address is refused before anything is signed. | [src/payments/buyer.ts](src/payments/buyer.ts), [src/registry/resolvePayee.ts](src/registry/resolvePayee.ts) | [test/resolvePayee.test.ts](test/resolvePayee.test.ts), the hostile-buyer checks in the end-to-end log |
+| One payment per request, and a replayed payment is refused. | [src/payments/ledger.ts](src/payments/ledger.ts) | [test/payments.ledger.test.ts](test/payments.ledger.test.ts) |
+| A stored verdict goes only to the original payer, after the payment's signature verifies, once. | [src/payments/cachedReplay.ts](src/payments/cachedReplay.ts) | [test/payments.cached.test.ts](test/payments.cached.test.ts) |
+| No charge for malformed input or an inconclusive answer. | [src/payments/chargeability.ts](src/payments/chargeability.ts) | the "not charged" checks in the end-to-end log |
+| Spend caps: the buyer's rolling 24 hours survive restarts; the server caps each payer and the sponsor's budget. | [src/payments/spendLog.ts](src/payments/spendLog.ts), [src/payments/ledger.ts](src/payments/ledger.ts) | [test/spendLog.test.ts](test/spendLog.test.ts), [test/payments.ledger.test.ts](test/payments.ledger.test.ts) |
+| A payer that keeps getting uncharged answers is refused. | [src/payments/freebies.ts](src/payments/freebies.ts) | [test/freebies.test.ts](test/freebies.test.ts), the end-to-end log |
+| Separate rate budgets for unpaid calls, payment-bearing calls and the free preview. | [src/service/admission.ts](src/service/admission.ts) | [test/admission.test.ts](test/admission.test.ts) |
+| Outbound checks reach only public addresses, connect to the address that was checked, re-check every redirect, stop after 5 seconds (links) or 12 seconds in total (IPFS), and run at most 8 at a time. | [src/service/realProbes.ts](src/service/realProbes.ts) | [test/realProbes.test.ts](test/realProbes.test.ts) |
+| An unconfigured paid service is closed, and a "durable ledger" claim is checked. | [src/payments/config.ts](src/payments/config.ts) | [test/payments.config.test.ts](test/payments.config.test.ts) |
+| The demo order store cannot be pointed at a real escrow: it refuses to start if any mainnet setting is present. | [src/buyer/orderStore.ts](src/buyer/orderStore.ts) | [test/buyer.decide.test.ts](test/buyer.decide.test.ts) |
 
-## Registering the agent on testnet
+## Path to production
 
-Run from `concordium/`. All steps are rerunnable and print every request and response.
+This is what stands between the demo and a real deployment, most important first. Each item says what the code does today.
 
-```bash
-node scripts/registry/01-build-card.ts          # build the Agent Card, save exact bytes
-# commit and push public/agent-card.json, then:
-node scripts/registry/02-check-hosted.ts --wait # hash what the public URL really serves
-node scripts/registry/03-build-register.ts      # sign-ready register payload
-node scripts/registry/04-sign-submit.ts         # dry run: simulates on the node, sends nothing
-node scripts/registry/04-sign-submit.ts --submit  # signs with CCD_OWNER_PRIVATE_KEY and submits
-node scripts/registry/05-verify.ts              # agent_of, is_active, verify_agent_card, check_badge
-node scripts/registry/06-build-badge.ts         # add the badge to the card
-# commit and push, then 02-check-hosted.ts --wait, then:
-node scripts/registry/07-build-set-agent-uri.ts # payload to pin the new hash
-node scripts/registry/04-sign-submit.ts --payload .data/set-agent-uri-payload.json --submit
-node scripts/registry/05-verify.ts
-```
+1. **Real delivery evidence.** Carrier status comes from fixed fixtures ([src/service/probes.ts](src/service/probes.ts)), so every tracking verdict says `simulated`. Needed: a carrier integration with real credentials in place of the stub. Until then the release policy never releases early outside demo mode ([src/buyer/releasePolicy.ts](src/buyer/releasePolicy.ts)).
+2. **Durable payment memory.** The ledger is one local file read by one process ([src/payments/ledger.ts](src/payments/ledger.ts)). The public service reports `ledgerDurable: false` at `/x402/status`, so a restart resets replay protection and the payer caps. Needed: a persistent disk with `X402_LEDGER_DURABLE=true`, or a database; more than one instance is not supported.
+3. **Key custody.** The sponsor key is an environment variable ([src/payments/config.ts](src/payments/config.ts)), and the agent owner is also the payee ([trajectory/evidence.json](trajectory/evidence.json)). Needed: a managed secrets store, separate owner, payee and sponsor keys, and rotation.
+4. **Trust in verdicts.** A verdict is unsigned and the evidence hash only proves consistency ([src/buyer/decide.ts](src/buyer/decide.ts)). A validator can still be wrong or dishonest. Needed: signed verdicts and more than one independent validator.
+5. **Registry trust.** Every registry read goes through Concordium's hosted service ([src/registry/hostedReader.ts](src/registry/hostedReader.ts)). Needed: read the registry contract through your own node.
+6. **Proof reuse.** The validator never sees the order ([src/service/validate.ts](src/service/validate.ts)), so one valid proof could back many orders. Needed: bind a proof to an order and detect reuse.
+7. **Disputes and reputation.** Nothing in this repository handles either. A flagged order only changes a stub store ([src/buyer/orderStore.ts](src/buyer/orderStore.ts)). Needed: a review and appeal flow, a refund rule, and a record of how often each validator is right.
+8. **Mainnet.** Every constant is testnet: the registry contract in [src/registry/types.ts](src/registry/types.ts) and the network id used by [src/payments/config.ts](src/payments/config.ts). The price is a fixed amount of CCD while the sponsor's fee moves. Needed: mainnet ids and endpoints, pricing tied to a stable unit, and an independent security review before any real funds.
+9. **Arc and Concordium reconciliation.** No code connects an Arc escrow order to a Concordium payment. Needed: a durable record linking the order, the verdict and the payment, a plan for holding CCD, and a rule for what happens when one side succeeds and the other fails.
+10. **Request limits.** The per-client rate-limit key comes from a header a caller can fake ([src/service/rateLimit.ts](src/service/rateLimit.ts)); the overall limits are the backstop. Needed: protection at the network edge.
 
-The signing key lives only in `concordium/.env` (git-ignored). See `.env.example`.
+Finding-level detail, including what was fixed and what is still open, is in [docs/09-judge-review.md](docs/09-judge-review.md) and [docs/10-second-review.md](docs/10-second-review.md).
 
-### Payee and agentWallet
+## Evidence
 
-```bash
-node scripts/registry/09-resolve-payee.ts [TOKEN_ADDRESS] [--card-claim ACCOUNT]  # who may be paid, read from chain
-node scripts/registry/08-set-agent-wallet.ts [--new-wallet ADDR] [--format raw|wallet]  # then 04-sign-submit.ts --payload .data/set-agent-wallet-payload.json
-npm test                                         # offline tests; add LIVE_REGISTRY=1 for the live ones
-```
+| What | Where | How to check it |
+| --- | --- | --- |
+| Registration, the latest card re-pin and four demo payments, each with its sender, recipient, amount and who paid the fee | [trajectory/evidence.json](trajectory/evidence.json) | `node scripts/verify-evidence.ts` asks the chain and compares |
+| The badge is valid and the card hash equals the chain | The registry's own check | `curl -s https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu` |
+| A recorded paid run of four orders, with the decisions and who paid what | [trajectory/judge-demo-2026-11-17.txt](trajectory/judge-demo-2026-11-17.txt) | Read it, or rerun with `--pay` |
+| The end-to-end run against testnet, including the attacks it refuses | [trajectory/x402/e2e-2026-11-17T13-50-45-895Z.log](trajectory/x402/e2e-2026-11-17T13-50-45-895Z.log) | Rerun [scripts/x402-e2e.ts](scripts/x402-e2e.ts) |
+| Every registry request and response from the registration | [trajectory/registry/transcript.jsonl](trajectory/registry/transcript.jsonl) | Read it |
+| What was done in each working session, including the mistakes | [trajectory/](trajectory/) (`run-01.md` onward) | Read it |
 
-## Keeping the free Render service awake
+The earlier end-to-end logs in [trajectory/x402/](trajectory/x402/) are kept on purpose: several of them contain failed runs and the bugs they exposed.
 
-Render's free tier spins a service down after 15 minutes without traffic, and a cold start takes about a minute. The registry's card check does not wait that long. Use an external monitor (for example UptimeRobot, 5 minute interval) on `/health`.
+## Repository map
 
-Render gives each workspace 750 free instance hours per month, shared by all free web services. One service awake all month uses about 720 to 744 of them, so keeping two free services awake exhausts the budget and Render suspends all free services until the next month. Check Billing > Monthly Included Usage in the Render dashboard before enabling it, or move this service to a paid instance.
-
-## The MCP tool
-
-`POST /mcp` speaks MCP over Streamable HTTP (stateless, JSON responses) and exposes one tool, `validate_delivery_proof`. Send `Accept: application/json, text/event-stream`.
-
-- Input: `proof` (the exact deliveryProof string, a JSON object with `type` of `tracking`, `url`, `ipfs` or `text`) and an optional `orderRef`.
-- Output: `verdict` (`pass` or `fail`), `code`, `reason`, `retryable`, `checks`, `evidenceHash`, `proofSha256`, `simulated`.
-- Link and IPFS checks are real; the carrier lookup is a simulated stub, and every response says so (`simulated`).
-
-Try it:
-
-```bash
-curl -s -X POST http://localhost:3002/mcp \
-  -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_delivery_proof","arguments":{"proof":"{\"type\":\"tracking\",\"value\":\"1Z999AA10123456784\",\"carrier\":\"UPS\",\"note\":\"\"}"}}}'
-```
-
-## The buyer
-
-`src/buyer/` is the Node port of the escrow decision. Before paying anything it verifies the validator from the registry (badge, active status, card hash, card endpoint, payee). Only then does it pay over x402, call the tool and decide: release now, flag for review, or fall back to the existing timer. `scripts/buyer-verify-live.ts` runs the verification against the real testnet registry without paying.
-
-## Modes and environment variables (paid service)
-
-The service is paid by default and fails closed. If it is not configured correctly, `/mcp` answers 503 and `/x402/status` says why; it never falls back to free.
-
-- `X402_MODE`: unset or `paid` (default), or `free` to serve verdicts without payment on purpose.
-- `CCD_FACILITATOR_PRIVATE_KEY` and `CCD_FACILITATOR_ADDRESS`: the sponsor account that pays fees. Secret; set on the host only.
-- `X402_LEDGER_DURABLE=true` if the ledger file is on persistent storage, or `X402_ALLOW_EPHEMERAL_LEDGER=true` to accept that a restart resets payment memory.
-- `X402_LEDGER_FILE` (default `.data/payments.jsonl`), `PRICE_MICRO_CCD`, `PAYER_DAILY_MAX_MICRO`, `SPONSOR_DAILY_BUDGET_MICRO`, `ESTIMATED_SPONSOR_FEE_MICRO`, `REGISTRY_TOKEN_ADDRESS`.
-
-## Try it
-
-- **Service:** https://jarawork-agent.onrender.com (a page with live status, the Agent Card and the testnet block).
-- **Verify the validator yourself (free, no account):** `node scripts/judge-demo.ts` checks the agent in the Concordium registry: registered, active, card hash equal to the chain, endpoint, payee.
-- **Run the whole flow (needs your own Concordium testnet account with test CCD):** put `CCD_PAYER_ADDRESS` and `CCD_PAYER_PRIVATE_KEY` in `concordium/.env`, then `node scripts/judge-demo.ts --pay`. It runs four stub orders: verify, pay over x402, get a verdict, decide. One of them uses the real link check and is paid for but deliberately not released. A recorded run is in `trajectory/judge-demo-2026-11-17.txt`.
-- **Call the tool directly from an MCP client:** connect to `https://jarawork-agent.onrender.com/mcp` and call `validate_delivery_proof`. The service is paid: an unpaid call returns the payment requirement (7.5 CCD, paid to the registry wallet, fees sponsored).
-
-Honest limits:
-- **Links are checked for real** (a guarded request: https only, internal addresses refused, redirects re-checked). A responding link does not prove it shows the delivery.
-- **IPFS retrieval is real but unreliable from shared servers:** public gateways rate-limit them, so the answer is often "unavailable, try later" (not charged). Set `IPFS_GATEWAYS` to your own gateway for dependable results.
-- **Carrier status is a simulated stub** and every such verdict says so.
-- Orders are a stub store; nothing here touches the JaraWork escrow or any mainnet.
-
-## More settings
-
-- `LIVE_LINK_CHECKS=false` turns the real link and IPFS checks off (labelled stubs instead).
-- `IPFS_GATEWAYS` comma-separated https gateways for IPFS retrieval.
-- Rate limits on `/mcp`, in three separate budgets so cheap spam cannot starve costly calls: unpaid calls `RATE_LIMIT_PER_MIN` (60 per client) and `RATE_LIMIT_GLOBAL_PER_MIN` (3000 in total); calls that carry a payment `PAID_RATE_LIMIT_PER_MIN` (30) and `PAID_RATE_LIMIT_GLOBAL_PER_MIN` (240); and the free preview form `PREVIEW_RATE_LIMIT_PER_MIN` (30) and `PREVIEW_RATE_LIMIT_GLOBAL_PER_MIN` (300). The per-client key comes from a header a caller can fake, so the global limits are the backstop.
-- `X402_MAX_UNCHARGED_PER_MIN` (default 5): how many uncharged answers (malformed input, inconclusive checks) one verified payer may ask for per minute before it is refused for a while. Outbound checks are also capped at 8 at a time, and one IPFS check never takes more than 12 seconds in total.
-
-## Restart safety (read this before relying on the payment memory)
-
-The payment ledger remembers which request ids were paid, which signed payments were used, and the spend caps. If it is lost, the same request can be charged twice and the caps reset.
-
-- By default the ledger is a file in the container, which is **erased on every restart**. You must choose: `X402_ALLOW_EPHEMERAL_LEDGER=true` (accept that, shown as `ledgerDurable:false` on `/x402/status`) or `X402_LEDGER_DURABLE=true` (claim it is on persistent storage).
-- A durable claim is **checked, not trusted**: the service refuses to open for payments if the ledger directory is on the container's own filesystem, on a RAM disk, or cannot be inspected.
-- To get real durability on Render: attach a persistent disk (a paid service is required; disks are about $0.25 per GB per month), mount it at `/var/data`, then set `X402_LEDGER_FILE=/var/data/payments.jsonl`, `X402_LEDGER_DURABLE=true`, and remove `X402_ALLOW_EPHEMERAL_LEDGER`.
-- The buyer side has the same duty: the buyer's paid log and its daily spend log (`src/buyer/paidLog.ts`, `src/payments/spendLog.ts`) are required arguments. Pass a file to survive restarts, or `null` to accept memory-only on purpose.
+| Path | Contents |
+| --- | --- |
+| [server.mjs](server.mjs) | The HTTP service and its routes |
+| [src/service/](src/service/) | The validator: tool, checks, evidence hash, link and IPFS probes, rate budgets |
+| [src/validator/](src/validator/) | Format rules for tracking numbers, links and IPFS identifiers |
+| [src/payments/](src/payments/) | x402 paywall, facilitator, ledger, fee accounting, the buyer's payment policy |
+| [src/buyer/](src/buyer/) | Validator verification and the release decision |
+| [src/registry/](src/registry/) | Registry reads and the payee lookup |
+| [scripts/](scripts/) | Judge demo, evidence check, end-to-end run, and the registration steps in `scripts/registry/` |
+| [test/](test/) | Offline tests |
+| [public/](public/) | The service page, the Agent Card and the share image |
+| [docs/](docs/) | [architecture.md](docs/architecture.md), [demo-video-script.md](docs/demo-video-script.md), [submission-checklist.md](docs/submission-checklist.md), the two reviews, and planning notes written before the work that may differ from what was built (`01` to `08`, [integration-map.md](docs/integration-map.md)) |

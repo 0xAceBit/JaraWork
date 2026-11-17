@@ -1,0 +1,16 @@
+{
+  "note": "Every transaction the README or demo script cites. Check them against the chain with: node scripts/verify-evidence.ts (no key needed).",
+  "accounts": {
+    "owner": "47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk",
+    "payer": "3HKu4eSXZBTeCmf6XV51EQ1HuBe3tDNDo1TbDcEBzPgYrRHg1V",
+    "sponsor": "3EZWRpdzPzi8WfsGRsiupiQEGZ6DjouZsANczD1uKEpkFL7qwc"
+  },
+  "transactions": [
+    { "label": "agent registration (CIS-8004 register)", "hash": "2b829c80ed1a1bce963fd31772671f62f7adb362f6759ea7aec5376f3486c336", "expect": { "transactionType": "update", "sender": "owner" } },
+    { "label": "latest card re-pin (CIS-8004 setAgentURI)", "hash": "73ab7ad41abd885417bb4ff076862a518cef15c3e44ae1a1136831ea4d8912f9", "expect": { "transactionType": "update", "sender": "owner" } },
+    { "label": "demo payment, order A", "hash": "90c4df07f29d70ce316102e68e15ca721d008a3a46e0d23bd0af72ba60dd8bba", "expect": { "transactionType": "transfer", "sender": "payer", "sponsor": "sponsor", "to": "owner", "amountMicro": "7500000" } },
+    { "label": "demo payment, order B", "hash": "0ee6bb613a6a85a9a4e93233a8940da4a483b55ed63615ad0676326f9e0aa291", "expect": { "transactionType": "transfer", "sender": "payer", "sponsor": "sponsor", "to": "owner", "amountMicro": "7500000" } },
+    { "label": "demo payment, order C", "hash": "53d14fa088795eb619849bfb8bcc9bef0e259a3ab9d484c493b5dc4b2e2ad8e5", "expect": { "transactionType": "transfer", "sender": "payer", "sponsor": "sponsor", "to": "owner", "amountMicro": "7500000" } },
+    { "label": "demo payment, order D", "hash": "ad2d7cf44b2b24371d99bc422359b9e695eb743c0bcc249f3db7897d46881315", "expect": { "transactionType": "transfer", "sender": "payer", "sponsor": "sponsor", "to": "owner", "amountMicro": "7500000" } }
+  ]
+}
