@@ -6,7 +6,7 @@
 - Concordium's own verification: https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu (returns `badge_valid: true`)
 - Agent: registry token 1008, token address `JyP9YR6Wk3YPaGx3e8zyu`, CIS-8004 registry contract 12802,0 on testnet, owner `47rTdQXdTQkWiL4fbHqdkxdtdpmWVGRTy7kXxXgxNJuirVV3pk`
 - Transactions (search the hash on https://testnet.ccdscan.io): registration `2b829c80ed1a1bce963fd31772671f62f7adb362f6759ea7aec5376f3486c336`, latest card pin `73ab7ad41abd885417bb4ff076862a518cef15c3e44ae1a1136831ea4d8912f9`
-- Paid verdicts from the recorded live run: see `trajectory/judge-demo-2026-11-11-run2.txt` (four payment hashes and the fee split)
+- Paid verdicts from the recorded live run: see `trajectory/judge-demo-2026-11-17.txt` (four payment hashes and the fee split)
 - Run logs: `trajectory/` (one file per working session) and `trajectory/x402/` (end-to-end test logs)
 - Honest self-review: `docs/09-judge-review.md`; integration notes: `docs/integration-map.md`; diagrams: `docs/architecture.md`
 

@@ -105,7 +105,7 @@ const store = new StubOrderStore([
   { key: 'C', orderRef: `demo-${stamp}-c`, amountDisplay: '15 USDC (display only)', proof: proof('text', 'Left it with the neighbour'), status: 'Delivered' },
   { key: 'D', orderRef: `demo-${stamp}-d`, amountDisplay: '60 USDC (display only)', proof: proof('url', 'https://example.com/'), status: 'Delivered' },
 ])
-const expected: Record<string, string> = { A: 'release (valid UPS number)', B: 'flag (bad check digit)', C: 'flag (free text is never verified)', D: 'release (the link really responds: a REAL network check)' }
+const expected: Record<string, string> = { A: 'release (valid UPS number)', B: 'flag (bad check digit)', C: 'flag (free text is never verified)', D: 'defer (the link really responds, a REAL network check, but a page that exists is not proof of delivery)' }
 const who = [PAYER, verified.validator.wallet, SPONSOR]
 const before = await readBalances(chain, who)
 

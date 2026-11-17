@@ -16,26 +16,26 @@ STEP 2  Four delivered orders, each: re-verify, pay over x402, get a verdict, de
   Order A  expected: release (valid UPS number)
     decision   RELEASE_NOW  (VALIDATED)
     reason     The carrier reports this parcel as delivered. This answer comes from a simulated lookup, not a real one.
-    evidence   84d7a732979566bd...   paid calls: 1   payment tx: 144c7255403190f5e624151bf2461e7e644adefe5a6a6649f3869df0a56d6507
+    evidence   84d7a732979566bd...   paid calls: 1   payment tx: 90c4df07f29d70ce316102e68e15ca721d008a3a46e0d23bd0af72ba60dd8bba
 
   Order B  expected: flag (bad check digit)
     decision   FLAG_FOR_REVIEW  (INVALID_FORMAT)
     reason     Postal (UPU S10) tracking number has an invalid check digit.
-    evidence   13f3cab89c1e7bb6...   paid calls: 1   payment tx: 3effa1bfae364a0acb5559ff2e6c80e9986f9c3117d3ca8314034d8221bddf5a
+    evidence   13f3cab89c1e7bb6...   paid calls: 1   payment tx: 0ee6bb613a6a85a9a4e93233a8940da4a483b55ed63615ad0676326f9e0aa291
 
   Order C  expected: flag (free text is never verified)
     decision   FLAG_FOR_REVIEW  (NOT_VERIFIABLE)
     reason     Free text cannot be verified by a machine. It needs a human reviewer.
-    evidence   74f5941f2eb361a6...   paid calls: 1   payment tx: 32fa3919a91522ae4c30f4df7babb97d63fbe1e28c39d1665f448acb942e6ec4
+    evidence   74f5941f2eb361a6...   paid calls: 1   payment tx: 53d14fa088795eb619849bfb8bcc9bef0e259a3ab9d484c493b5dc4b2e2ad8e5
 
-  Order D  expected: release (the link really responds: a REAL network check)
-    decision   RELEASE_NOW  (VALIDATED)
-    reason     The link is well formed and responds. This does not confirm what it shows.
-    evidence   67489d1c23ae6d7c...   paid calls: 1   payment tx: a372018daf4956fbde2bbbed5b0fb44f5ff638507e31932e75c7658062c4cfd0
+  Order D  expected: defer (the link really responds, a REAL network check, but a page that exists is not proof of delivery)
+    decision   DEFER_TO_TIMER  (AVAILABILITY_ONLY)
+    reason     The pass shows that a page or file exists, not that anything was delivered, so it does not release funds. The order stays with the timer or a human.
+    evidence   67489d1c23ae6d7c...   paid calls: 1   payment tx: ad2d7cf44b2b24371d99bc422359b9e695eb743c0bcc249f3db7897d46881315
 
 STEP 3  Who paid what (from the chain, testnet CCD)
   buyer paid       30.000000 CCD   (the price, no fee)
   validator earned 30.000000 CCD
-  sponsor paid     17.714588 CCD   (the network fees)
+  sponsor paid     18.318916 CCD   (the network fees)
 
 Note: the carrier lookup is a simulated stub and says so. The link check (order D) is a real request to the real internet.
