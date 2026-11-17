@@ -1,0 +1,30 @@
+{
+  "payments": [
+    {
+      "requestId": "pay_5cdfb37190f70f2ebbe82585b7ba4092",
+      "txHash": "c334617c982f1abddc1131dfa9bf9ca0eeb2629d00d9fa5eed60e0ca335a6770",
+      "accounting": {
+        "sponsorFeeMicro": "4579729",
+        "buyerPaidMicro": "7500000",
+        "payeeReceivedMicro": "7500000",
+        "basis": "summary-and-balances"
+      }
+    },
+    {
+      "requestId": "pay_6b2e3e70de08fb6007170994f009fedc",
+      "txHash": "cb03cae6cf2db5d3ec09900871f32937260a2216b548da6753775c1b496cc5c5",
+      "accounting": {
+        "sponsorFeeMicro": "4579729",
+        "buyerPaidMicro": "7500000",
+        "payeeReceivedMicro": "7500000",
+        "basis": "summary-and-balances"
+      }
+    }
+  ],
+  "totals": {
+    "buyerPaidMicro": "15000000",
+    "sponsorFeesMicro": "9159458",
+    "payerBalanceChange": "-15000000",
+    "sponsorBalanceChange": "-9159458"
+  }
+}

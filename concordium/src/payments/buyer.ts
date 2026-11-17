@@ -9,6 +9,7 @@ import { ExactConcordiumScheme } from '@x402/concordium/exact/client'
 import type { Network } from '@x402/core/types'
 import { createx402MCPClient } from '@x402/mcp'
 import { resolvePayee } from '../registry/resolvePayee.ts'
+import type { SpendLog } from './spendLog.ts'
 
 export interface BuyerPolicy {
   network: Network
@@ -23,6 +24,8 @@ export interface BuyerConfig {
   payerAddress: string
   payerPrivateKey: string
   policy: BuyerPolicy
+  /** Where the daily spend is recorded. Required: pass `new SpendLog(null)` to accept memory-only on purpose. */
+  spendLog: SpendLog
   /** Optional hook to observe raw HTTP traffic (the e2e test uses it to capture a signed payment). */
   fetch?: typeof fetch
 }
@@ -39,7 +42,6 @@ export interface BuyerResult {
 export type BuyerLog = (event: string, data: Record<string, unknown>) => void
 
 export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
-  let spentMicro = 0n
   let refusal: string | null = null
   let approvedAmount = 0n
   const { policy } = config
@@ -49,7 +51,7 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
     if (accept.network !== policy.network) return `network ${accept.network} is not ${policy.network}`
     if (accept.asset !== 'CCD') return `asset ${accept.asset} is not CCD`
     if (BigInt(accept.amount) > policy.maxPerPaymentMicro) return `amount ${accept.amount} is above the per-payment cap ${policy.maxPerPaymentMicro}`
-    if (spentMicro + BigInt(accept.amount) > policy.dailyMaxMicro) return 'the daily cap would be exceeded'
+    if (config.spendLog.total24h() + BigInt(accept.amount) > policy.dailyMaxMicro) return 'the daily cap would be exceeded'
     if (accept.extra?.feePayer !== policy.allowedFeePayer) return `fee payer ${String(accept.extra?.feePayer)} is not the allowed sponsor`
     // The hosted registry can be briefly unavailable or rate limited. Retry a couple of times, then fail closed:
     // an unconfirmed payee means no payment.
@@ -98,7 +100,7 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
   await client.connect(new StreamableHTTPClientTransport(config.url, config.fetch ? { fetch: config.fetch } : {}))
 
   return {
-    spentMicro: (): bigint => spentMicro,
+    spentMicro: (): bigint => config.spendLog.total24h(),
     async validate(proof: string, orderRef?: string): Promise<BuyerResult> {
       refusal = null
       let result: Awaited<ReturnType<typeof client.callTool>>
@@ -126,7 +128,7 @@ export async function createBuyer(config: BuyerConfig, log: BuyerLog) {
       const settlement = (result.paymentResponse ?? null) as Record<string, unknown> | null
       // "Charged" means a new settlement happened. A cancelled payment or a cached retry is not a charge.
       const charged = result.paymentMade && settlement?.success === true && settlement.cached !== true
-      if (charged) spentMicro += approvedAmount
+      if (charged) config.spendLog.add(approvedAmount)
       return {
         verdict: looksLikeVerdict ? (parsed as Record<string, unknown>) : null,
         paymentMade: charged,

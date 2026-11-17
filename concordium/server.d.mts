@@ -9,4 +9,6 @@ export function createAppServer(options?: {
   paymentStatus?: () => Record<string, unknown>
   closedReason?: string
   limiter?: import('./src/service/rateLimit.ts').RateLimiter
+  paidLimiter?: import('./src/service/rateLimit.ts').RateLimiter
+  previewLimiter?: import('./src/service/rateLimit.ts').RateLimiter
 }): Server

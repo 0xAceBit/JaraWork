@@ -27,9 +27,9 @@ The validator may only accelerate or flag. If anything about it is wrong or unav
    3. The card's badge extension names the same token address as `VALIDATOR_BADGE`.
    4. The card lists an `MCP` service with an https endpoint. That endpoint comes from the verified card, never from our env.
    5. `get_agent_wallet` returns a wallet. This is `registryWallet`.
-   Results may be cached for 5 minutes. Re-verify when stale, always before paying.
+   A successful verification is cached for 5 minutes (`src/buyer/verifyCache.ts`); a failure is never cached. The payment itself still re-reads the payee from the registry every time. Trade-off: a validator revoked inside the 5 minutes can still be paid until the cache expires.
 2. **Guard the payment.** Before signing, check the 402 requirement: network is the testnet CAIP-2; scheme is `exact`; `payTo` equals `registryWallet` (never a wallet the card or server claims); asset is on the allowlist (default CCD); amount is at most `MAX_PRICE_MICRO_CCD`; `extra.feePayer` equals `ALLOWED_FEE_PAYER`; timeout is at most 120 s. Any failure: refuse to pay.
-3. **Paid call.** Through the x402 MCP client. At most 2 paid attempts per (order, `proofSha256`), 30 s timeout each, result cached 1 hour so a retry never pays twice.
+3. **Paid call.** Through the x402 MCP client. The server returns the stored verdict, without a second charge, to the same verified payer; the buyer's paid log (`PaidLog`, required) and daily spend log (`SpendLog`, required) stop it paying twice or exceeding its cap across restarts when they are file-backed.
 4. **Check the response.** `schemaVersion` is 1, `proofSha256` equals the hash we computed, and `orderRef` echoes. Otherwise treat the validator as untrusted.
 5. **Decide** using the table below.
 
@@ -39,9 +39,10 @@ The validator may only accelerate or flag. If anything about it is wrong or unav
 | Step 2 refuses | DEFER_TO_TIMER, security alert |
 | Call fails before settlement, after retry | DEFER_TO_TIMER |
 | Paid but no usable result | DEFER_TO_TIMER, log `paid_no_result` |
-| `pass` true, all required checks ok, none simulated | RELEASE_NOW |
-| `pass` true with a simulated check | RELEASE_NOW in demo mode only (banner shown), DEFER_TO_TIMER otherwise |
-| `pass` false and `retryable` | retry at +5 min and +30 min, then DEFER_TO_TIMER |
+| `pass`, with a REAL carrier confirmation | RELEASE_NOW |
+| `pass`, with a SIMULATED carrier confirmation | RELEASE_NOW in demo mode only (banner shown), DEFER_TO_TIMER (`SIMULATED_EVIDENCE`) otherwise |
+| `pass`, but only a link responds or a file is retrievable | DEFER_TO_TIMER (`AVAILABILITY_ONLY`), even in demo mode, unless the operator sets `acceptAvailabilityEvidence`. A worker can point at any live page, so this proves existence, not delivery. Implemented in `src/buyer/releasePolicy.ts`; the buyer decides this from the check names and does not trust the validator's own labels |
+| `pass` false and `retryable` | DEFER_TO_TIMER by default (`maxRetries` is 0). With `maxRetries` above 0, each retry is a new paid call under a new reference |
 | `pass` false, not retryable | FLAG_FOR_REVIEW |
 | kind `text` | FLAG_FOR_REVIEW, never RELEASE_NOW |
 
@@ -53,26 +54,26 @@ The validator may only accelerate or flag. If anything about it is wrong or unav
 
 Two honest caveats:
 
-- Early release shortens the dispute window the 24-hour timer gives today. Production needs a minimum hold (`MIN_HOLD_SECONDS`, value to be decided) and probably an opt-in.
+- Early release shortens the dispute window the 24-hour timer gives today. Production needs a minimum hold and probably an opt-in. **Not implemented** (roadmap): there is no `MIN_HOLD_SECONDS` setting yet.
 - Format-only checks on local carriers will flag honest deliveries, which is why Phase B does not block.
 
 ## Stub order store
 
 The demo never touches the mainnet escrow, Circle, or USDC.
 
-- Lives in `concordium/src/store/`. In memory, seeded at start, snapshot to a gitignored `concordium/.data/` file.
-- Interface: `listDelivered()`, `release(key)`, `flag(key, reason)`. Amounts are display strings. Nothing moves.
+- Lives in `concordium/src/buyer/orderStore.ts`. In memory only, seeded at start.
+- Interface: `delivered()`, `get(key)`, `all()`, `release(key, note)`, `flag(key, note)`, `defer(key, note)`. Amounts are display strings. Nothing moves.
 - Refuses to start if any of these env names is set: `CIRCLE_MAINNET_API_KEY`, `CIRCLE_MAINNET_ENTITY_SECRET`, `VITE_MAINNET_ESCROW_CONTRACT_ADDRESS`, `VITE_MAINNET_AGENT_WALLET_ID`, `VITE_MAINNET_AGENT_WALLET_ADDRESS`.
 - No imports from `server/agent.ts`, `src/`, or any Arc RPC.
 
-Seeded scenarios (what each proves):
+Seeded scenarios. This was the original design list. `scripts/judge-demo.ts` implements four orders (valid UPS number, bad check digit, free text, a real link); the destructive cases (10 to 12) and the rest are covered by unit tests with test doubles, not as seeded orders. Outcomes below reflect the current release policy:
 
 | # | Proof | Expected outcome |
 | --- | --- | --- |
-| 1 | https link that loads | RELEASE_NOW |
+| 1 | https link that loads | DEFER_TO_TIMER (`AVAILABILITY_ONLY`) |
 | 2 | https link to an internal host | FLAG_FOR_REVIEW (BLOCKED_TARGET) |
 | 3 | https link returning 404 | FLAG_FOR_REVIEW (UNREACHABLE) |
-| 4 | valid IPFS CID that is retrievable | RELEASE_NOW |
+| 4 | valid IPFS CID that is retrievable | DEFER_TO_TIMER (`AVAILABILITY_ONLY`) |
 | 5 | malformed IPFS CID | FLAG_FOR_REVIEW |
 | 6 | UPS number the fixture marks delivered | RELEASE_NOW (demo mode, simulated banner) |
 | 7 | tracking number not in the fixture | FLAG_FOR_REVIEW (NOT_CONFIRMED) |
@@ -86,8 +87,8 @@ Scenarios 10 to 12 use a registry test double for the destructive cases and the 
 
 ## Config names (names only, never values)
 
-- Buyer: `CCD_PAYER_ADDRESS`, `CCD_PAYER_PRIVATE_KEY`, `VALIDATOR_BADGE`, `TRUSTED_REGISTRY`, `MAX_PRICE_MICRO_CCD`, `ALLOWED_FEE_PAYER`, `ALLOWED_ASSETS`, `MIN_HOLD_SECONDS`, `DEMO_MODE`, `CCD_NETWORK`.
-- Validator service: `PORT`, `PAY_TO_ADDRESS`, `PRICE_MICRO_CCD`, `IPFS_GATEWAYS`, `DEMO_MODE`.
+- Buyer (read by `scripts/judge-demo.ts`): `CCD_PAYER_ADDRESS`, `CCD_PAYER_PRIVATE_KEY`, `VALIDATOR_BADGE`, `SERVICE_URL`, `ALLOWED_FEE_PAYER`. The price cap and the registry are set in code. **Not implemented** (roadmap): `TRUSTED_REGISTRY`, `MAX_PRICE_MICRO_CCD`, `ALLOWED_ASSETS`, `MIN_HOLD_SECONDS`, `CCD_NETWORK`.
+- Validator service: `PORT`, `PRICE_MICRO_CCD`, `IPFS_GATEWAYS`, `LIVE_LINK_CHECKS`, `X402_*`, and the rate-limit settings in the README. The payee is never configured: it is read from the registry.
 - Facilitator: `CCD_FACILITATOR_ADDRESS`, `CCD_FACILITATOR_PRIVATE_KEY`.
 - One-off registration scripts: `CCD_OWNER_ADDRESS`, `CCD_OWNER_PRIVATE_KEY`.
 

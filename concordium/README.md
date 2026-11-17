@@ -13,11 +13,11 @@ Built with [Arc Studio](https://studio.arc.io)
 **Verify it yourself in three minutes (free, no account):**
 1. Open Concordium's own check: https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9YR6Wk3YPaGx3e8zyu and look for `badge_valid: true`.
 2. Open https://jarawork-agent.onrender.com and try the free format preview.
-3. Run `node scripts/judge-demo.ts`: it verifies the validator from the registry (registered, active, card hash equals the chain, endpoint, payee). Add `--pay` with your own testnet account to run four orders end to end.
+3. Run `cd concordium && npm install` once (Node 22 or later), then `node scripts/judge-demo.ts`: it verifies the validator from the registry (registered, active, card hash equals the chain, endpoint, payee). Add `--pay` with your own testnet account to run four orders end to end.
 
-**What is real:** the registration and badge, the sponsored x402 payments with the fee split read from the chain, the payee taken from the registry, the buyer's refusals, and the link check (a guarded request). **What is simulated, and says so in every answer:** carrier delivery status. **What is not connected yet:** the Arc escrow (orders are a stub store). Details and diagrams: [docs/architecture.md](docs/architecture.md).
+**What is real:** the registration and badge, the sponsored x402 payments with the fee split read from the chain, the payee taken from the registry, the buyer's refusals, and the link check (a guarded request). **What is simulated, and says so in every answer:** carrier delivery status. **What the buyer will not do:** release funds because a link responds or a file exists. **What is not connected yet:** the Arc escrow (orders are a stub store). Details and diagrams: [docs/architecture.md](docs/architecture.md).
 
-**Evidence:** registry token 1008 on testnet; registration `2b829c80…c336`; four paid verdicts in [trajectory/judge-demo-2026-11-11-run2.txt](trajectory/judge-demo-2026-11-11-run2.txt); a 22-check live end-to-end log in `trajectory/x402/`; 230+ tests; a public self-review that found 15 problems and fixed the serious ones: [docs/09-judge-review.md](docs/09-judge-review.md). Submission list: [docs/submission-checklist.md](docs/submission-checklist.md). Video script: [docs/demo-video-script.md](docs/demo-video-script.md).
+**Evidence:** registry token 1008 on testnet; registration `2b829c80…c336`; four paid verdicts in [trajectory/judge-demo-2026-11-11-run2.txt](trajectory/judge-demo-2026-11-11-run2.txt); a 22-check live end-to-end log in `trajectory/x402/`; 230+ tests; two public self-reviews written as a hostile judge: [docs/09-judge-review.md](docs/09-judge-review.md) (15 findings, 8 fixed or partly fixed) and [docs/10-second-review.md](docs/10-second-review.md) (14 more, with what was fixed and what remains open). Submission list: [docs/submission-checklist.md](docs/submission-checklist.md). Video script: [docs/demo-video-script.md](docs/demo-video-script.md).
 
 **Path to production (not built, written down):** key custody in a managed secrets service with separate owner, payee and sponsor keys; validator reputation and signed verdicts; a dispute path; mainnet configuration; and reconciliation between the Arc escrow (USDC) and the Concordium payment (CCD). See the last section of the review.
 
@@ -27,11 +27,14 @@ This module lives on the `concordium-hackathon` branch and is not part of the li
 
 `validate_delivery_proof` takes the proof a worker submits and returns pass or fail with a reason. It understands three kinds of proof:
 
-- **URLs:** well-formed `https` links on public domains. Local, internal and IP-address links are rejected.
-- **IPFS content IDs:** CIDv0 and CIDv1 (sha2-256), bare, as `ipfs://`, or inside a gateway link.
-- **Tracking numbers:** UPU postal numbers (check digit verified), UPS-style numbers, and common digit-only carrier formats.
+- **URLs:** a guarded request checks that a secure, public address responds. Internal, local and IP-address links are refused.
+- **IPFS content IDs:** CIDv0 and CIDv1 (sha2-256), bare, as `ipfs://`, or inside a gateway link; then retrieval is attempted through public gateways.
+- **Tracking numbers:** UPU postal numbers (check digit verified), UPS-style numbers, and common digit-only carrier formats. Carrier delivery status is a simulated stub.
 
-Current limits: these are structure checks. They do not confirm that a link loads, that IPFS content exists, or that a parcel was delivered. Those checks are planned next.
+Current limits, stated plainly:
+- A responding link proves a page exists, not that anything was delivered. An IPFS file that can be retrieved proves a file exists. A worker can point at any live page or any pinned file.
+- So the **buyer** does not release funds on either. Only a real carrier confirmation may release funds, and carrier status is still simulated, which means **outside demo mode nothing is released early today**: orders fall back to the timer or go to a human. This is deliberate and tested (`src/buyer/releasePolicy.ts`).
+- Public IPFS gateways rate-limit shared servers, so retrieval is often "unavailable, try later" (not charged).
 
 ## Tech stack
 
@@ -44,8 +47,8 @@ Prerequisite: Node.js 22 or later.
 ```bash
 cd concordium
 npm install
-npm start        # service on :3002, routes /health and /chain
-npm test         # validator unit tests
+npm start        # service on :3002: /, /health, /chain, /mcp, /demo/preview, /x402/status, /.well-known/agent-card.json
+npm test         # the whole offline test suite (no network needed)
 npm run smoke    # Concordium SDK check against testnet (read only)
 ```
 
@@ -131,7 +134,7 @@ Render gives each workspace 750 free instance hours per month, shared by all fre
 
 - Input: `proof` (the exact deliveryProof string, a JSON object with `type` of `tracking`, `url`, `ipfs` or `text`) and an optional `orderRef`.
 - Output: `verdict` (`pass` or `fail`), `code`, `reason`, `retryable`, `checks`, `evidenceHash`, `proofSha256`, `simulated`.
-- In this testnet build the carrier, link and IPFS lookups are simulated stubs, and every response says so.
+- Link and IPFS checks are real; the carrier lookup is a simulated stub, and every response says so (`simulated`).
 
 Try it:
 
@@ -171,4 +174,14 @@ Honest limits:
 
 - `LIVE_LINK_CHECKS=false` turns the real link and IPFS checks off (labelled stubs instead).
 - `IPFS_GATEWAYS` comma-separated https gateways for IPFS retrieval.
-- `RATE_LIMIT_PER_MIN` (default 60 per client) and `RATE_LIMIT_GLOBAL_PER_MIN` (default 600 in total) limit calls to `/mcp`.
+- Rate limits on `/mcp`, in three separate budgets so cheap spam cannot starve costly calls: unpaid calls `RATE_LIMIT_PER_MIN` (60 per client) and `RATE_LIMIT_GLOBAL_PER_MIN` (3000 in total); calls that carry a payment `PAID_RATE_LIMIT_PER_MIN` (30) and `PAID_RATE_LIMIT_GLOBAL_PER_MIN` (240); and the free preview form `PREVIEW_RATE_LIMIT_PER_MIN` (30) and `PREVIEW_RATE_LIMIT_GLOBAL_PER_MIN` (300). The per-client key comes from a header a caller can fake, so the global limits are the backstop.
+- `X402_MAX_UNCHARGED_PER_MIN` (default 5): how many uncharged answers (malformed input, inconclusive checks) one verified payer may ask for per minute before it is refused for a while. Outbound checks are also capped at 8 at a time, and one IPFS check never takes more than 12 seconds in total.
+
+## Restart safety (read this before relying on the payment memory)
+
+The payment ledger remembers which request ids were paid, which signed payments were used, and the spend caps. If it is lost, the same request can be charged twice and the caps reset.
+
+- By default the ledger is a file in the container, which is **erased on every restart**. You must choose: `X402_ALLOW_EPHEMERAL_LEDGER=true` (accept that, shown as `ledgerDurable:false` on `/x402/status`) or `X402_LEDGER_DURABLE=true` (claim it is on persistent storage).
+- A durable claim is **checked, not trusted**: the service refuses to open for payments if the ledger directory is on the container's own filesystem, on a RAM disk, or cannot be inspected.
+- To get real durability on Render: attach a persistent disk (a paid service is required; disks are about $0.25 per GB per month), mount it at `/var/data`, then set `X402_LEDGER_FILE=/var/data/payments.jsonl`, `X402_LEDGER_DURABLE=true`, and remove `X402_ALLOW_EPHEMERAL_LEDGER`.
+- The buyer side has the same duty: the buyer's paid log and its daily spend log (`src/buyer/paidLog.ts`, `src/payments/spendLog.ts`) are required arguments. Pass a file to survive restarts, or `null` to accept memory-only on purpose.

@@ -182,26 +182,49 @@ export function gatewaysFromEnv(value: string | undefined): readonly string[] | 
 
 export interface LinkProbeOptions extends GuardOptions {
   gateways?: readonly string[]
-  /** IPFS retrieval can be slow when the content is not cached, so it gets longer than a normal link. */
+  /** IPFS retrieval can be slow when the content is not cached, so each gateway gets longer than a normal link. */
   ipfsTimeoutMs?: number
+  /** The most time one IPFS check may take across all gateways together. */
+  ipfsBudgetMs?: number
+  /** The most outbound checks running at once. Beyond this the answer is "unavailable", which is retryable and not charged. */
+  maxConcurrent?: number
 }
 
 export function createLinkProbe(io: Fetcher = createNodeFetcher(), options: LinkProbeOptions = {}): LinkProbe {
   const gateways = options.gateways ?? DEFAULT_GATEWAYS
+  const maxConcurrent = options.maxConcurrent ?? 8
+  let active = 0
+  // Without a cap, a flood of slow targets could hold every worker (and every socket) for seconds each.
+  async function withSlot<T>(whenBusy: T, work: () => Promise<T>): Promise<T> {
+    if (active >= maxConcurrent) return whenBusy
+    active += 1
+    try {
+      return await work()
+    } finally {
+      active -= 1
+    }
+  }
   return {
     simulated: false,
-    probeUrl: async (url) => toLinkResult(await guardedHead(url, io, options)),
-    probeCid: async (cid): Promise<CidProbeResult> => {
-      if (!/^[A-Za-z0-9]{10,128}$/.test(cid)) return { status: 'not_found' }
-      let sawTemporary = false
-      for (const gateway of gateways) {
-        const result = toLinkResult(await guardedHead(`${gateway}/ipfs/${cid}`, io, { ...options, timeoutMs: options.ipfsTimeoutMs ?? 8000 }))
-        if (result.status === 'reachable') return { status: 'retrievable' }
-        if (result.status === 'unavailable') sawTemporary = true
-      }
-      // Only a definite "not there" from every gateway counts as not found; anything temporary means try again later.
-      return { status: sawTemporary ? 'unavailable' : 'not_found' }
-    },
+    probeUrl: (url) => withSlot<LinkProbeResult>({ status: 'unavailable' }, async () => toLinkResult(await guardedHead(url, io, options))),
+    probeCid: (cid) =>
+      withSlot<CidProbeResult>({ status: 'unavailable' }, async () => {
+        if (!/^[A-Za-z0-9]{10,128}$/.test(cid)) return { status: 'not_found' }
+        const deadline = Date.now() + (options.ipfsBudgetMs ?? 12_000)
+        let sawTemporary = false
+        for (const gateway of gateways) {
+          const remaining = deadline - Date.now()
+          if (remaining <= 0) {
+            sawTemporary = true // out of time before every gateway was tried
+            break
+          }
+          const result = toLinkResult(await guardedHead(`${gateway}/ipfs/${cid}`, io, { ...options, timeoutMs: Math.min(options.ipfsTimeoutMs ?? 8000, remaining) }))
+          if (result.status === 'reachable') return { status: 'retrievable' }
+          if (result.status === 'unavailable') sawTemporary = true
+        }
+        // Only a definite "not there" from every gateway counts as not found; anything temporary means try again later.
+        return { status: sawTemporary ? 'unavailable' : 'not_found' }
+      }),
   }
 }
 

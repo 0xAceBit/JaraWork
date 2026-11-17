@@ -11,6 +11,7 @@ import { parseProof } from '../service/envelope.ts'
 import { evidenceHashFor } from '../service/evidence.ts'
 import { paidKey, type PaidLog } from './paidLog.ts'
 import type { StubOrder, StubOrderStore } from './orderStore.ts'
+import { releaseGate } from './releasePolicy.ts'
 import type { VerifiedValidator, VerifyResult } from './verifyValidator.ts'
 
 export type Outcome = 'RELEASE_NOW' | 'FLAG_FOR_REVIEW' | 'DEFER_TO_TIMER'
@@ -47,10 +48,15 @@ export interface DecideDeps {
    * so the buyer can only ever pay the service it just verified.
    */
   payerFor: (endpoint: string) => Payer
-  /** The buyer's memory of what it already paid for; stops a restart from paying twice. */
-  paidLog?: PaidLog
+  /** The buyer's memory of what it already paid for; stops a restart from paying twice. Required on purpose: pass `new PaidLog(null)` to accept memory-only. */
+  paidLog: PaidLog
   /** Simulated evidence (stubbed carrier lookups) may release only in demo mode. */
   demoMode: boolean
+  /**
+   * Release on availability-only evidence: a link responds, or an IPFS file is retrievable. Off by default,
+   * because a worker can point at any live page. Turn it on only where the link target is trusted.
+   */
+  acceptAvailabilityEvidence?: boolean
   /** Extra paid attempts for an inconclusive answer. Each one is a new payment, so the default is 0. */
   maxRetries?: number
   delay?: (ms: number) => Promise<void>
@@ -102,7 +108,7 @@ export async function decideRelease(order: StubOrder, deps: DecideDeps): Promise
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const orderRef = attempt === 0 ? order.orderRef : `${order.orderRef}.r${attempt}`
     const key = paidKey(orderRef, order.proof)
-    if (deps.paidLog?.get(key) === 'answered') {
+    if (deps.paidLog.get(key) === 'answered') {
       return { ...base, validatorVerified: true, paidCalls, outcome: 'DEFER_TO_TIMER', code: 'ALREADY_PAID', reason: 'An answer was already received and paid for this request, so it will not be paid for again.' }
     }
     const result = await payer.validate(order.proof, orderRef).catch((error: unknown) => {
@@ -111,7 +117,7 @@ export async function decideRelease(order: StubOrder, deps: DecideDeps): Promise
     })
     if (result?.paymentMade === true) {
       paidCalls += 1
-      deps.paidLog?.set(key, 'paid')
+      deps.paidLog.set(key, 'paid')
     }
     const state = { ...base, validatorVerified: true, paidCalls }
 
@@ -131,15 +137,14 @@ export async function decideRelease(order: StubOrder, deps: DecideDeps): Promise
     }
 
     const verdict = result.verdict
-    if (result.paymentMade || deps.paidLog?.get(key) === 'paid') deps.paidLog?.set(key, 'answered')
+    if (result.paymentMade || deps.paidLog.get(key) === 'paid') deps.paidLog.set(key, 'answered')
     const evidenceHash = verdict.evidenceHash as string
     const reason = typeof verdict.reason === 'string' ? verdict.reason : ''
     const extra = { evidenceHash, ...(txHash ? { txHash } : {}) }
 
     if (verdict.verdict === 'pass') {
-      if (verdict.simulated === true && !deps.demoMode) {
-        return { ...state, ...extra, outcome: 'DEFER_TO_TIMER', code: 'SIMULATED_EVIDENCE', reason: 'The pass rests on simulated lookups, which cannot release funds outside demo mode.' }
-      }
+      const gate = releaseGate(verdict, { demoMode: deps.demoMode, acceptAvailabilityEvidence: deps.acceptAvailabilityEvidence === true })
+      if (!gate.release) return { ...state, ...extra, outcome: 'DEFER_TO_TIMER', code: gate.code, reason: gate.reason }
       return { ...state, ...extra, outcome: 'RELEASE_NOW', code: 'VALIDATED', reason }
     }
     // A failed verdict.

@@ -10,6 +10,7 @@ import { PaidLog } from '../src/buyer/paidLog.ts'
 import { parseProof } from '../src/service/envelope.ts'
 import { evidenceHashFor } from '../src/service/evidence.ts'
 import { createStubProbes } from '../src/service/probes.ts'
+import { createRealProbes } from '../src/service/realProbes.ts'
 import { validateDeliveryProof } from '../src/service/validate.ts'
 import type { VerifyResult } from '../src/buyer/verifyValidator.ts'
 
@@ -24,9 +25,12 @@ const VERIFIED: VerifyResult = {
 const REFUSED: VerifyResult = { ok: false, code: 'HASH_MISMATCH', reason: 'card does not match', retryable: false, step: '4' }
 
 function verdictFor(o: StubOrder, orderRef: string, over: Record<string, unknown> = {}): Record<string, unknown> {
+  const simulated = over.simulated === true
   const base = {
-    schemaVersion: '1', verdict: 'pass', kind: 'tracking', code: 'OK', reason: 'ok', retryable: false, simulated: false,
-    checks: [{ name: 'format', ok: true, simulated: false }], proofSha256: sha(o.proof), orderRef, ...over,
+    schemaVersion: '1', verdict: 'pass', kind: 'tracking', code: 'OK', reason: 'ok', retryable: false, simulated,
+    // A tracking verdict: the format check plus the carrier check (simulated when the verdict says so).
+    checks: [{ name: 'format', ok: true, simulated: false }, { name: 'carrier_status', ok: true, simulated }],
+    proofSha256: sha(o.proof), orderRef, ...over,
   }
   const parsed = parseProof(o.proof)
   const evidenceHash = evidenceHashFor({ kind: base.kind as never, proof: base.code === 'BAD_INPUT' || !parsed.ok ? null : parsed.envelope, checks: base.checks as never })
@@ -48,7 +52,7 @@ function payerOf(answer: (o: StubOrder, ref: string, n: number) => Partial<PayRe
   }
 }
 const deps = (payer: Payer, over: Partial<DecideDeps> = {}): DecideDeps => ({
-  badge: 'B', verify: () => Promise.resolve(VERIFIED), payerFor: () => payer, demoMode: true, delay: () => Promise.resolve(), ...over,
+  badge: 'B', verify: () => Promise.resolve(VERIFIED), payerFor: () => payer, paidLog: new PaidLog(null), demoMode: true, delay: () => Promise.resolve(), ...over,
 })
 const passWith = (over: Record<string, unknown> = {}) => (o: StubOrder, ref: string): Partial<PayResult> => ({ verdict: verdictFor(o, ref, over) })
 
@@ -230,5 +234,44 @@ void describe('the buyer remembers what it paid for (restart safety)', () => {
     const d2 = await decideRelease(order('1'), deps(second.payer, { paidLog: new PaidLog(file) }))
     assert.equal(d2.code, 'ALREADY_PAID')
     assert.equal(second.calls.length, 0, 'no second payment')
+  })
+})
+
+void describe('only real evidence of delivery releases funds (finding #1)', () => {
+  const linkVerdict = (o: StubOrder, ref: string): Record<string, unknown> =>
+    verdictFor(o, ref, { kind: 'url', checks: [{ name: 'format', ok: true, simulated: false }, { name: 'link_reachable', ok: true, simulated: false }] })
+  const urlOrder = (): StubOrder => order('link', JSON.stringify({ type: 'url', value: 'https://example.com/', carrier: '', note: '' }))
+
+  void it('a link that merely responds is NOT released, in production or in demo mode', async () => {
+    for (const demoMode of [false, true]) {
+      const { payer } = payerOf((o, ref) => ({ verdict: linkVerdict(o, ref) }))
+      const d = await decideRelease(urlOrder(), deps(payer, { demoMode }))
+      assert.equal(d.outcome, 'DEFER_TO_TIMER')
+      assert.equal(d.code, 'AVAILABILITY_ONLY')
+    }
+  })
+
+  void it('it is released only when the operator explicitly accepts availability as proof', async () => {
+    const { payer } = payerOf((o, ref) => ({ verdict: linkVerdict(o, ref) }))
+    const d = await decideRelease(urlOrder(), deps(payer, { acceptAvailabilityEvidence: true }))
+    assert.equal(d.outcome, 'RELEASE_NOW')
+  })
+
+  void it('end to end with the REAL validator: a responding link is paid for but not released', async () => {
+    const o = urlOrder()
+    const probes = createRealProbes({ resolve: () => Promise.resolve(['93.184.216.34']), request: () => Promise.resolve({ status: 200 }) })
+    const real = await validateDeliveryProof({ proof: o.proof, orderRef: o.orderRef }, probes, () => new Date('2026-11-17T10:00:00Z'))
+    assert.equal(real.verdict, 'pass')
+    const { payer } = payerOf(() => ({ verdict: { ...real } as unknown as Record<string, unknown> }))
+    const d = await decideRelease(o, deps(payer))
+    assert.equal(d.outcome, 'DEFER_TO_TIMER')
+    assert.equal(d.code, 'AVAILABILITY_ONLY')
+    assert.equal(d.paidCalls, 1, 'the answer was real and was paid for')
+  })
+
+  void it('a malformed list of checks cannot crash the buyer', async () => {
+    const { payer } = payerOf((o, ref) => ({ verdict: verdictFor(o, ref, { checks: [null, { name: 'carrier_status', ok: true, simulated: false }] }) }))
+    const d = await decideRelease(order('x'), deps(payer))
+    assert.equal(d.outcome === 'RELEASE_NOW' || d.outcome === 'DEFER_TO_TIMER', true)
   })
 })

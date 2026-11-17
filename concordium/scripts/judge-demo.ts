@@ -19,6 +19,7 @@ import { cachedVerifier } from '../src/buyer/verifyCache.ts'
 import { verifyValidator } from '../src/buyer/verifyValidator.ts'
 import { readBalances } from '../src/payments/accounting.ts'
 import { createBuyer } from '../src/payments/buyer.ts'
+import { SpendLog } from '../src/payments/spendLog.ts'
 import { TESTNET_REGISTRY } from '../src/registry/types.ts'
 import { checkKeyAgainstAccount } from './registry/keycheck.ts'
 import { paths } from './registry/lib.ts' // also loads concordium/.env
@@ -77,6 +78,8 @@ if (!(await checkKeyAgainstAccount(chain, PAYER, payerKey)).belongs) {
 }
 
 const opened: { close: () => Promise<void> }[] = []
+// The daily spend cap is remembered in a file, so a restart does not reset it.
+const spendLog = new SpendLog(join(paths.data, 'judge-spend.jsonl'))
 const policy = { network: CONCORDIUM_TESTNET_CAIP2, registryTokenAddress: BADGE, allowedFeePayer: SPONSOR, maxPerPaymentMicro: 15_000_000n, dailyMaxMicro: 150_000_000n }
 const quietLog = (event: string, data: Record<string, unknown>): void => {
   if (event === 'buyer.approved') say(`          buyer approved the terms: ${String((data.terms as { amount?: string })?.amount)} microCCD to the registry wallet`)
@@ -87,7 +90,7 @@ const payerFor = (endpoint: string): Payer => {
   let buyer: Awaited<ReturnType<typeof createBuyer>> | null = null
   return {
     validate: async (proof, orderRef) => {
-      buyer ??= await createBuyer({ url: new URL(endpoint), payerAddress: PAYER, payerPrivateKey: payerKey, policy }, quietLog)
+      buyer ??= await createBuyer({ url: new URL(endpoint), payerAddress: PAYER, payerPrivateKey: payerKey, policy, spendLog }, quietLog)
       if (!opened.includes(buyer)) opened.push(buyer)
       return buyer.validate(proof, orderRef)
     },

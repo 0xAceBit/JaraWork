@@ -95,6 +95,8 @@ Consequence to state in the README: JaraWork targets emerging markets, and local
 
 ## SSRF and abuse rules (URL and IPFS fetches)
 
+> Status: implemented in `src/service/realProbes.ts`, with `src/service/admission.ts` and `src/service/rateLimit.ts`. Differences from the list below: the response body is never read at all (headers only), and outbound checks are capped at 8 at a time.
+
 - Resolve DNS, then connect to the resolved address. Block loopback, private, link-local, CGNAT, multicast, unique-local IPv6 and IPv4-mapped IPv6.
 - Re-check every redirect hop. Never follow a redirect to a blocked address.
 - No proxy variables, no cookies, no custom headers from the caller.

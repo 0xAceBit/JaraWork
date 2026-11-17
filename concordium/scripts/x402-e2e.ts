@@ -10,6 +10,7 @@ import { ConcordiumGRPCNodeClient, credentials } from '@concordium/web-sdk/nodej
 import { createAppServer } from '../server.mjs'
 import { readBalances } from '../src/payments/accounting.ts'
 import { createBuyer } from '../src/payments/buyer.ts'
+import { SpendLog } from '../src/payments/spendLog.ts'
 import type { BuyerPolicy } from '../src/payments/buyer.ts'
 import { loadPaymentsConfig } from '../src/payments/config.ts'
 import { createPaymentContext } from '../src/payments/paymentContext.ts'
@@ -37,6 +38,7 @@ const expect = (ok: boolean, what: string, detail: unknown = ''): void => {
 const proof = (type: string, value: string, carrier = ''): string => JSON.stringify({ type, value, carrier, note: '' })
 
 process.env.X402_ALLOW_EPHEMERAL_LEDGER = 'true' // a local test file, declared on purpose
+process.env.X402_MAX_UNCHARGED_PER_MIN = '4' // small, so the free-work cap is easy to reach
 process.env.X402_LEDGER_FILE = ledgerFile
 process.env.PAYER_DAILY_MAX_MICRO = '15000000' // two payments of 7.5 CCD, so the third must hit the cap
 const cfg = loadPaymentsConfig()
@@ -53,7 +55,11 @@ for (const [name, account, key] of [
   if (!check.belongs) process.exit(2)
 }
 
-const payments = await createPaymentContext(cfg, chain, log)
+const serverRefusals: string[] = []
+const payments = await createPaymentContext(cfg, chain, (event, data) => {
+  if (event === 'x402.refused') serverRefusals.push(String(data.why))
+  log(event, data)
+})
 if (payments.payTo === PAYER) {
   log('ABORT', { what: 'the payer and the payee are the same account' })
   process.exit(2)
@@ -79,7 +85,7 @@ const capturingFetch: typeof fetch = async (input, init) => {
   return fetch(input, init)
 }
 const open = (over: Partial<BuyerPolicy> = {}, capture = false) =>
-  createBuyer({ url, payerAddress: PAYER, payerPrivateKey: payerKey, policy: { ...policy, ...over }, ...(capture ? { fetch: capturingFetch } : {}) }, log)
+  createBuyer({ url, payerAddress: PAYER, payerPrivateKey: payerKey, policy: { ...policy, ...over }, spendLog: new SpendLog(null), ...(capture ? { fetch: capturingFetch } : {}) }, log)
 
 // 1. Hostile buyer policies: each must refuse BEFORE any money moves.
 for (const [name, over] of [
@@ -132,6 +138,27 @@ expect(inTransit.verdict?.retryable === true && inTransit.paymentMade === false,
 const afterNonAnswers = await readBalances(chain, who)
 expect(afterNonAnswers[PAYER] === beforeNonAnswers[PAYER] && afterNonAnswers[cfg.facilitatorAddress] === beforeNonAnswers[cfg.facilitatorAddress], 'F5: no money moved for the non-answers')
 expect(payments.ledger.all().filter((r) => r.status === 'settled').length === 1, 'still exactly one settled payment')
+
+// #3: a payer that keeps asking for answers that end up uncharged is refused, and no money moves.
+// This runs while the payer's daily cap still has room, so only the free-work limit can be what refuses it.
+const beforeBurst = await readBalances(chain, who)
+let blockedAt = 0
+let answeredFree = 0
+for (let i = 1; i <= 8; i += 1) {
+  const r = await buyer.validate(proof('tracking', '123456789012', 'FedEx'), `order-free-${i}`)
+  if (r.verdict === null) {
+    blockedAt = i
+    break
+  }
+  if (r.paymentMade === false && r.verdict.retryable === true) answeredFree += 1
+}
+const afterBurst = await readBalances(chain, who)
+log('burst.free_work', { blockedAt, answeredFree, serverRefusals })
+expect(blockedAt >= 1 && blockedAt <= 6 && answeredFree >= 1, '#3: a payer asking for too many uncharged answers is refused', { blockedAt, answeredFree })
+expect(serverRefusals.includes('TOO_MANY_UNCHARGED') && !serverRefusals.includes('CAP_PAYER_DAILY'), '#3: it was the free-work limit that refused it, not the spend cap', serverRefusals)
+expect(afterBurst[PAYER] === beforeBurst[PAYER] && afterBurst[cfg.facilitatorAddress] === beforeBurst[cfg.facilitatorAddress], '#3: no money moved during the burst')
+log('burst.waiting', { seconds: 62, why: 'the free-work window is 60 seconds; the payer must be allowed back before the next paid call' })
+await new Promise<void>((resolve) => setTimeout(resolve, 62_000))
 
 const second = await buyer.validate(proof('url', 'https://example.com/proof/42'), 'order-2')
 expect(second.paymentMade && second.verdict?.verdict === 'pass', 'paid call 2 settled', second.settlement)

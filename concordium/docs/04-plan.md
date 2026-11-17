@@ -1,5 +1,7 @@
 # 04. Day-by-day plan: Nov 6 to Dec 9
 
+> Historical: this is the plan written on 2026-11-05. What actually happened, and when, is in `trajectory/` and the two reviews (`docs/09`, `docs/10`).
+
 Written 2026-11-05. Assumptions to confirm: roughly 2 to 3 focused hours on build days, lighter weekends, and a Nov 22 checkpoint that expects a working testnet demo. I do not know the checkpoint requirements or the submission format. Confirm both on Nov 6.
 
 "You" rows are actions only you can do (accounts, faucet, keys, organizer contact). Keys go into `.env` or Render env vars yourself, never into chat. Share public addresses only.

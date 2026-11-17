@@ -106,3 +106,7 @@ New observations from the rerun:
 |---|---|---|
 | F4 | Partly fixed | Link reachability and IPFS retrieval are now real network checks with an SSRF guard (https only, port 443, no IP literals, every resolved address must be public, connection pinned to the checked address, redirects re-checked, 5 second limit, headers only). Tested with fakes (66 tests) and against the real internet. Carrier status is still a simulated stub. Public IPFS gateways rate-limit shared servers (429), so retrieval is often "unavailable". |
 | F10 | Partly fixed | A per-client and a global rate limit on `/mcp`. The client key comes from a forwarded header that can be faked, so the global limit is the backstop. State is per process. Sponsor-fee griefing remains UNVERIFIED. |
+
+## Second review (2026-11-17)
+
+A second pass, after these fixes, found 14 further problems. They, and what was done about each, are in [docs/10-second-review.md](10-second-review.md).

@@ -39,8 +39,11 @@ const DESCRIPTION =
   'Checks one delivery proof for a JaraWork escrow order and returns verdict (pass or fail), a short reason, ' +
   'and evidenceHash, a SHA-256 over the evidence that was examined. "proof" is the exact string stored in the ' +
   'order: a JSON object {"type":"tracking|url|ipfs|text","value":"...","carrier":"..."}. Free text never passes. ' +
-  'IMPORTANT: in this testnet build the carrier, link and IPFS lookups are SIMULATED by stubs. When "simulated" ' +
-  'is true, a pass is not real-world evidence of delivery.'
+  'WHAT A PASS MEANS: for a link, that the address responds (a real request); for an IPFS hash, that the file can ' +
+  'be retrieved through public gateways. Neither proves anything was delivered. Tracking numbers are format-checked ' +
+  'for real, but carrier delivery status is SIMULATED by a stub in this testnet build: when "simulated" is true, a ' +
+  'pass is not real-world evidence of delivery. Malformed input and inconclusive checks ("retryable": true) are ' +
+  'answered but not charged.'
 
 /** The tool handler's shape, so paid mode can wrap it without changing the free behaviour. */
 export type ToolHandler = (
@@ -67,7 +70,7 @@ export function createValidatorMcpServer(probes: Probes = createStubProbes(), wr
         orderRef: z.string().optional().describe('Optional opaque reference for your own records, 1 to 64 characters of A-Z a-z 0-9 . _ : -'),
       },
       outputSchema: VERDICT_SHAPE,
-      annotations: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: true },
     },
     wrap(async (args) => {
       const result = await validateDeliveryProof(args, probes)

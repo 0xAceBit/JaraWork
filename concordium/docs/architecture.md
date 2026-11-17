@@ -64,13 +64,16 @@ sequenceDiagram
 | Payee read from the registry, hostile-buyer refusals | Real |
 | Link check (guarded request, internal addresses refused) | Real network request |
 | IPFS retrieval through public gateways | Real, but public gateways often rate-limit servers ("try later", not charged) |
-| Carrier delivery status | Simulated stub, and every such verdict says so |
+| Carrier delivery status | Simulated stub, and every such verdict says so. Because only a REAL carrier confirmation may release funds, nothing releases early outside demo mode today |
 | Order store and the Arc escrow link | Stub; not connected |
 
 ## Safety properties that are tested
 
 - A verdict can only be fetched again by the payer who paid, with a payment whose signature verifies, once.
 - Malformed input and inconclusive checks are answered but not charged.
+- The buyer releases funds only on real evidence of delivery. A link that responds or a file that can be retrieved proves existence, so it is paid for but not released on (unless the operator opts in).
 - A refused or unverifiable validator is never paid: the order falls back to the existing timer.
 - The buyer never pays an address the server or the card names; it pays what the registry says.
+- Free work is limited: payment-bearing calls, unpaid calls and the free preview have separate rate budgets; a verified payer that keeps asking for uncharged answers is refused for a while; outbound checks are capped at 8 at a time.
+- Restart safety is explicit: the server's ledger must be declared durable (and the claim is checked) or accepted as ephemeral, and the buyer's paid log and spend log are required arguments.
 - Server fetches refuse internal addresses, re-check every redirect, and connect only to the address they checked.

@@ -52,7 +52,7 @@ void describe('free format preview', () => {
 
 void describe('preview route', () => {
   async function withServer<T>(limiter: ReturnType<typeof createRateLimiter> | undefined, run: (base: string) => Promise<T>): Promise<T> {
-    const server = createAppServer(limiter === undefined ? {} : { limiter })
+    const server = createAppServer(limiter === undefined ? {} : { previewLimiter: limiter })
     await new Promise<void>((resolve) => server.listen(0, resolve))
     try {
       return await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)

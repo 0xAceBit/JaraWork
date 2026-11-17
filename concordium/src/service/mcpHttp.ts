@@ -8,6 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { createValidatorMcpServer } from './mcp.ts'
 import type { ToolWrap } from './mcp.ts'
+import type { RateDecision } from './rateLimit.ts'
 import { createStubProbes } from './probes.ts'
 import type { Probes } from './probes.ts'
 
@@ -36,19 +37,30 @@ export async function handleMcpRequest(
   res: ServerResponse,
   probes: Probes = createStubProbes(),
   wrap?: ToolWrap,
+  admit?: (body: unknown) => RateDecision,
 ): Promise<void> {
   if (req.method !== 'POST') {
     res.setHeader('allow', 'POST')
     return rpcError(res, 405, -32000, 'Method not allowed. Use POST.')
   }
 
+  const tooMany = (decision: RateDecision | undefined): boolean => {
+    if (decision === undefined || decision.ok) return false
+    res.setHeader('retry-after', String(decision.retryAfterSeconds))
+    rpcError(res, 429, -32000, 'Too many requests. Try again later.')
+    return true
+  }
+
   let body: unknown
   try {
     body = JSON.parse(await readBody(req))
   } catch (err) {
+    // A request that cannot even be read still counts against the unpaid budget.
+    if (tooMany(admit?.(undefined))) return
     if (err instanceof RangeError) return rpcError(res, 413, -32600, 'Request body too large.')
     return rpcError(res, 400, -32700, 'Parse error: the body is not valid JSON.')
   }
+  if (tooMany(admit?.(body))) return
 
   const server = createValidatorMcpServer(probes, wrap)
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })

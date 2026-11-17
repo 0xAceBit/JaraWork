@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 import { describe, it } from 'node:test'
 import { createAppServer } from '../server.mjs'
-import { resolveServiceMode } from '../src/payments/config.ts'
+import { resolveServiceMode, type FsProbe } from '../src/payments/config.ts'
 
 const KEY = 'ab'.repeat(32)
 const PAID_OK = { CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_ALLOW_EPHEMERAL_LEDGER: 'true' }
@@ -53,9 +53,38 @@ void describe('ledger durability must be declared (F3)', () => {
     assert.equal(m.mode === 'paid' && m.config.ledgerDurable, false)
   })
 
-  void it('declaring durable storage is recorded', () => {
-    const m = resolveServiceMode({ CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_LEDGER_DURABLE: 'true' })
+  const EXT4 = 0xef53
+  const DISK: FsProbe = { ledgerDirDevice: () => 64, rootDevice: () => 1, ledgerDirFsType: () => EXT4 }
+
+  void it('declaring durable storage is recorded, when the ledger really is on a separate disk', () => {
+    const m = resolveServiceMode({ CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_LEDGER_DURABLE: 'true' }, DISK)
     assert.equal(m.mode === 'paid' && m.config.ledgerDurable, true)
+  })
+
+  void it('a durable claim is REFUSED when the ledger sits on the same filesystem as the container', () => {
+    const sameDevice: FsProbe = { ledgerDirDevice: () => 7, rootDevice: () => 7, ledgerDirFsType: () => EXT4 }
+    const m = resolveServiceMode({ CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_LEDGER_DURABLE: 'true' }, sameDevice)
+    assert.equal(m.mode, 'closed')
+    if (m.mode === 'closed') assert.match(m.reason, /erased on restart/)
+  })
+
+  void it('a RAM disk or the container overlay is refused even though it is a separate device', () => {
+    for (const [type, name] of [[0x01021994, /tmpfs/], [0x794c7630, /overlayfs/], [0x858458f6, /ramfs/]] as const) {
+      const ram: FsProbe = { ledgerDirDevice: () => 64, rootDevice: () => 1, ledgerDirFsType: () => type }
+      const m = resolveServiceMode({ CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_LEDGER_DURABLE: 'true' }, ram)
+      assert.equal(m.mode, 'closed')
+      if (m.mode === 'closed') assert.match(m.reason, name)
+    }
+  })
+
+  void it('a durable claim that cannot be checked is refused, not trusted', () => {
+    const blind: FsProbe = { ledgerDirDevice: () => null, rootDevice: () => 1, ledgerDirFsType: () => null }
+    assert.equal(resolveServiceMode({ CCD_FACILITATOR_PRIVATE_KEY: KEY, X402_LEDGER_DURABLE: 'true' }, blind).mode, 'closed')
+  })
+
+  void it('accepting an ephemeral ledger needs no disk check at all', () => {
+    const blind: FsProbe = { ledgerDirDevice: () => null, rootDevice: () => null, ledgerDirFsType: () => null }
+    assert.equal(resolveServiceMode(PAID_OK, blind).mode, 'paid')
   })
 
   void it('the ledger always has a file path by default, so it is never silently memory-only', () => {

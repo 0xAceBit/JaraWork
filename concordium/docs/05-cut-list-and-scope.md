@@ -1,5 +1,7 @@
 # 05. Cut list and scope-creep challenges
 
+> Historical: this is the cut list written on 2026-11-05. What actually happened, and when, is in `trajectory/` and the two reviews (`docs/09`, `docs/10`).
+
 Written 2026-11-05.
 
 ## Never cut (this is the product)

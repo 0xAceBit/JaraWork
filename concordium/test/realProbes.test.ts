@@ -210,3 +210,51 @@ void describe('inside the validator', () => {
     assert.equal(v.simulated, true)
   })
 })
+
+void describe('limits on outbound work (finding #3)', () => {
+  void it('refuses new checks beyond the concurrency cap with a retryable answer, and recovers afterwards', async () => {
+    const releases: (() => void)[] = []
+    const io: Fetcher = {
+      resolve: () => Promise.resolve(PUBLIC),
+      request: () => new Promise<HttpReply>((resolve) => releases.push(() => resolve({ status: 200 }))),
+    }
+    const probe = createLinkProbe(io, { maxConcurrent: 3 })
+    const running = [probe.probeUrl('https://example.com/1'), probe.probeUrl('https://example.com/2'), probe.probeUrl('https://example.com/3')]
+    await new Promise((r) => setTimeout(r, 20))
+    assert.equal(releases.length, 3, 'three requests are in flight')
+    assert.deepEqual(await probe.probeUrl('https://example.com/4'), { status: 'unavailable' })
+    assert.deepEqual(await probe.probeCid('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'), { status: 'unavailable' })
+    for (const release of releases) release()
+    assert.equal((await Promise.all(running)).every((r) => r.status === 'reachable'), true)
+    // After the slow ones finish, there is room again.
+    const again = probe.probeUrl('https://example.com/5')
+    await new Promise((r) => setTimeout(r, 20))
+    releases.at(-1)?.()
+    assert.equal((await again).status, 'reachable')
+  })
+
+  void it('a check that throws still frees its slot', async () => {
+    const io: Fetcher = { resolve: () => Promise.resolve(PUBLIC), request: () => Promise.reject(new Error('reset')) }
+    const probe = createLinkProbe(io, { maxConcurrent: 1 })
+    for (let i = 0; i < 4; i += 1) assert.equal((await probe.probeUrl('https://example.com/x')).status, 'unavailable')
+    assert.equal(probe.simulated, false)
+  })
+
+  void it('one IPFS check never takes longer than its total budget, however many gateways there are', async () => {
+    const calls: number[] = []
+    const io: Fetcher = {
+      resolve: () => Promise.resolve(['209.94.90.1']),
+      request: ({ timeoutMs }) =>
+        new Promise<HttpReply>((_resolve, reject) => {
+          calls.push(timeoutMs)
+          setTimeout(() => reject(Object.assign(new Error('slow'), { code: 'ETIMEDOUT' })), timeoutMs)
+        }),
+    }
+    const probe = createLinkProbe(io, { gateways: ['https://a.example', 'https://b.example', 'https://c.example', 'https://d.example'], ipfsTimeoutMs: 300, ipfsBudgetMs: 500 })
+    const started = Date.now()
+    assert.deepEqual(await probe.probeCid('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'), { status: 'unavailable' })
+    assert.ok(Date.now() - started < 800, 'finished within the budget plus a little')
+    assert.ok(calls.length <= 3, 'later gateways were skipped once the budget ran out')
+    assert.ok(calls.every((t) => t <= 300))
+  })
+})

@@ -17,6 +17,7 @@ import { isNonAnswer } from './chargeability.ts'
 import type { Balances } from './accounting.ts'
 import type { PaymentsConfig } from './config.ts'
 import { createFacilitator } from './facilitator.ts'
+import { FreebieLimiter } from './freebies.ts'
 import { PaymentLedger } from './ledger.ts'
 import type { PaymentRecord } from './ledger.ts'
 import { describeRequest } from './requestId.ts'
@@ -50,6 +51,7 @@ export async function createPaymentContext(config: PaymentsConfig, chain: Concor
 
   const { facilitator, client } = createFacilitator(config)
   const ledger = new PaymentLedger(config, config.ledgerFile)
+  const freebies = new FreebieLimiter(config.maxUnchargedPerMinute)
   facilitator.onSettleFailure((context) => {
     const key = payloadHashOf(context.paymentPayload)
     if (ledger.all().some((r) => r.payloadHash === key && r.status === 'verified')) ledger.failed(key, 'settlement failed')
@@ -77,6 +79,12 @@ export async function createPaymentContext(config: PaymentsConfig, chain: Concor
         log('x402.refused', { why: 'the payer could not be identified from the signed transaction' })
         return false
       }
+      // The signature has been verified at this point, so this payer really is who it says. A payer that keeps
+      // asking for answers that end up uncharged (free work for the server) is refused for a while.
+      if (freebies.tooMany(payer)) {
+        log('x402.refused', { payer, why: 'TOO_MANY_UNCHARGED' })
+        return false
+      }
       const payloadHash = payloadHashOf(paymentPayload)
       const outcome = ledger.begin({ ...facts, payer, payTo, amountMicro: BigInt(paymentRequirements.amount), payloadHash })
       if (outcome.kind !== 'new') {
@@ -93,6 +101,7 @@ export async function createPaymentContext(config: PaymentsConfig, chain: Concor
         // No answer was produced, so the wrapper cancels the payment. Close the ledger entry so the id is free again.
         pending.delete(payloadHashOf(paymentPayload))
         ledger.failed(payloadHashOf(paymentPayload), 'no answer was produced; the payment was not charged')
+        freebies.record(senderOf(paymentPayload))
         log('x402.not_charged', { payloadHash: payloadHashOf(paymentPayload) })
         return Promise.resolve()
       }

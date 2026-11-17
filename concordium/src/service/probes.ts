@@ -1,8 +1,8 @@
 /**
- * External lookups sit behind these interfaces. Everything here is a STUB with explicit
- * fixtures: it never touches the network and anything not in a fixture table is "not found".
- * Real carrier APIs and a guarded link fetcher replace these later without touching the
- * validator. Results derived from a stub are labelled `simulated` in the response.
+ * External lookups sit behind these interfaces. This file holds the STUBS: explicit fixtures that never
+ * touch the network, where anything not in a fixture table is "not found". The real, guarded link and IPFS
+ * checks live in realProbes.ts and are the default for the service; the carrier lookup is still a stub here
+ * until real carrier credentials exist. Results derived from a stub are labelled `simulated` in the response.
  */
 
 export interface CarrierLookupResult {
